@@ -12,7 +12,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request })
 
     const dbResult = await env.STORY_DB.prepare(
       `
-      SELECT STORY_ID, TITLE, SUMMARY_SHORT, SUMMARY_LONG, GENRE, TONE, SETTING,
+      SELECT STORY_ID, TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG, GENRE, TONE, SETTING,
              TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
              STORY_STATUS, SOURCE_COUNT, STATUS_NOTES
       FROM STORIES

@@ -17,6 +17,7 @@ export function mapStory(row: StoryRow) {
   return {
     storyId: row.STORY_ID,
     title: row.TITLE,
+    author: row.AUTHOR,
     summaryShort: row.SUMMARY_SHORT,
     summaryLong: row.SUMMARY_LONG,
     genre: row.GENRE,

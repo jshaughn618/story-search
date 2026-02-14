@@ -103,6 +103,7 @@ function fallbackMetadata(relativePath: string, status: StoryStatus, statusNotes
 
   return {
     title,
+    author: null,
     summary_short: statusNotes ?? `Ingestion status: ${status}`,
     summary_long: `This source was ingested with status ${status}. Review before relying on generated metadata.`,
     genre: "Unknown",
@@ -427,6 +428,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         extractMethod: ingest.extractMethod,
         statusNotes: ingest.statusNotes,
         title: metadata.title,
+        author: metadata.author,
         summaryShort: metadata.summary_short,
         summaryLong: metadata.summary_long,
         genre: metadata.genre,

@@ -25,6 +25,7 @@ export type ExtractMethod =
 
 export interface StoryMetadata {
   title: string;
+  author: string | null;
   summary_short: string;
   summary_long: string;
   genre: string;
@@ -55,6 +56,7 @@ export interface IndexedStory {
   extractMethod: ExtractMethod;
   statusNotes: string | null;
   title: string;
+  author: string | null;
   summaryShort: string;
   summaryLong: string;
   genre: string;
@@ -105,6 +107,7 @@ export interface ExistingStoryRow {
   CHUNK_COUNT: number;
   SOURCE_COUNT: number;
   TITLE: string;
+  AUTHOR: string | null;
 }
 
 export interface ExistingSourceRow {

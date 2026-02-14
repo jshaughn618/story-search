@@ -34,6 +34,7 @@ export interface SearchRequestBody {
 export interface StoryRow {
   STORY_ID: string;
   TITLE: string;
+  AUTHOR: string | null;
   SUMMARY_SHORT: string | null;
   SUMMARY_LONG: string | null;
   GENRE: string | null;

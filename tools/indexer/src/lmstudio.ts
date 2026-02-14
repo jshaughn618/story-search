@@ -58,11 +58,13 @@ function normalizeMetadata(input: unknown): StoryMetadata {
   const value = (input ?? {}) as Record<string, unknown>;
 
   const title = typeof value.title === "string" && value.title.trim() ? value.title.trim() : "Untitled Story";
+  const authorRaw = typeof value.author === "string" ? value.author.trim() : "";
   const summaryShortRaw = typeof value.summary_short === "string" ? value.summary_short.trim() : "";
   const summaryLongRaw = typeof value.summary_long === "string" ? value.summary_long.trim() : "";
 
   return {
     title,
+    author: authorRaw ? authorRaw.slice(0, 160) : null,
     summary_short: summaryShortRaw.slice(0, 280),
     summary_long: summaryLongRaw || summaryShortRaw,
     genre: typeof value.genre === "string" ? value.genre.trim().slice(0, 64) : "Unknown",
@@ -118,6 +120,7 @@ export async function extractStoryMetadata(
   const systemPrompt = `You are a story cataloging assistant. Return STRICT JSON only with this schema:
 {
   "title": "string",
+  "author": "string | null (null if unknown)",
   "summary_short": "<=280 chars",
   "summary_long": "3-6 sentences",
   "genre": "single best genre",

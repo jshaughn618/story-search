@@ -32,6 +32,7 @@ export interface BestChunk {
 export interface StoryResult {
   storyId: string;
   title: string;
+  author: string | null;
   summaryShort: string | null;
   summaryLong: string | null;
   genre: string | null;

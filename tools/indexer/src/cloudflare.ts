@@ -110,7 +110,7 @@ export class CloudflareClient {
     const rows = await this.d1Query<ExistingStoryRow>(
       `
       SELECT STORY_ID, SOURCE_PATH, RAW_HASH, CANON_HASH, R2_KEY, CHUNKS_KEY,
-             STORY_STATUS, CHUNK_COUNT, SOURCE_COUNT, TITLE
+             STORY_STATUS, CHUNK_COUNT, SOURCE_COUNT, TITLE, AUTHOR
       FROM STORIES
       WHERE CANON_HASH = ?
       LIMIT 1
@@ -126,11 +126,11 @@ export class CloudflareClient {
       INSERT OR REPLACE INTO STORIES (
         STORY_ID, SOURCE_PATH, CONTENT_HASH, RAW_HASH, CANON_HASH, STORY_STATUS,
         SOURCE_COUNT, CANON_TEXT_SOURCE, EXTRACT_METHOD, STATUS_NOTES,
-        TITLE, SUMMARY_SHORT, SUMMARY_LONG,
+        TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG,
         GENRE, TONE, SETTING, TAGS_JSON, THEMES_JSON, CONTENT_NOTES_JSON,
         WORD_COUNT, CHUNK_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         story.storyId,
@@ -144,6 +144,7 @@ export class CloudflareClient {
         story.extractMethod,
         story.statusNotes,
         story.title,
+        story.author,
         story.summaryShort,
         story.summaryLong,
         story.genre,
