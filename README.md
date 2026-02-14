@@ -160,6 +160,10 @@ npm run start -w tools/indexer -- reindex ./sample_stories --force-reindex
 npm run start -w tools/indexer -- status
 ```
 
+Notes:
+- The indexer auto-loads the nearest `.env` (including repo root `.env` when run with `-w tools/indexer`).
+- Folder paths can be repo-relative (for example `./stories/test`) or package-relative.
+
 ### 6) Run locally
 
 ```bash
