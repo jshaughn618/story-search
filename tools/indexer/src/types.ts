@@ -128,6 +128,8 @@ export interface IndexerConfig {
   lmStudioBaseUrl: string;
   lmStudioApiKey: string;
   lmStudioMetadataModel: string;
+  lmStudioTimeoutMs: number;
+  lmStudioMaxRetries: number;
   cfAiEmbedModel: string;
   cloudflareAccountId: string;
   cloudflareApiToken: string;

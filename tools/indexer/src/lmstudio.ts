@@ -8,6 +8,48 @@ interface ChatCompletionResponse {
   }>;
 }
 
+class LmStudioRequestError extends Error {
+  constructor(
+    readonly status: number,
+    readonly responseText: string,
+  ) {
+    super(`LM Studio chat request failed (${status}): ${responseText}`);
+  }
+}
+
+const STORY_METADATA_JSON_SCHEMA = {
+  name: "story_metadata",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "title",
+      "author",
+      "summary_short",
+      "summary_long",
+      "genre",
+      "tone",
+      "setting",
+      "themes",
+      "tags",
+      "content_notes",
+    ],
+    properties: {
+      title: { type: "string" },
+      author: { anyOf: [{ type: "string" }, { type: "null" }] },
+      summary_short: { type: "string" },
+      summary_long: { type: "string" },
+      genre: { type: "string" },
+      tone: { type: "string" },
+      setting: { type: "string" },
+      themes: { type: "array", items: { type: "string" }, maxItems: 5 },
+      tags: { type: "array", items: { type: "string" }, maxItems: 12 },
+      content_notes: { type: "array", items: { type: "string" }, maxItems: 8 },
+    },
+  },
+} as const;
+
 function buildMetadataPrompt(storyText: string) {
   const maxSection = 7000;
   if (storyText.length <= maxSection * 2) {
@@ -80,34 +122,82 @@ async function callChatCompletion(
   baseUrl: string,
   apiKey: string,
   model: string,
+  timeoutMs: number,
+  maxRetries: number,
   messages: Array<{ role: "system" | "user"; content: string }>,
 ): Promise<string> {
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages,
-    }),
-  });
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  if (!response.ok) {
-    throw new Error(`LM Studio chat request failed (${response.status}): ${await response.text()}`);
+  function isRetryable(error: unknown): boolean {
+    if (error instanceof LmStudioRequestError) {
+      return error.status === 408 || error.status === 429 || error.status >= 500;
+    }
+    if (!(error instanceof Error)) {
+      return false;
+    }
+    const cause = (error as Error & { cause?: { code?: string } }).cause;
+    const code = cause?.code ?? "";
+    if (code === "UND_ERR_HEADERS_TIMEOUT" || code === "UND_ERR_CONNECT_TIMEOUT") {
+      return true;
+    }
+    return error.message.toLowerCase().includes("fetch failed");
   }
 
-  const data = (await response.json()) as ChatCompletionResponse;
-  const content = data.choices?.[0]?.message?.content;
+  async function request(responseFormat: unknown): Promise<string> {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.1,
+        response_format: responseFormat,
+        messages,
+      }),
+    });
 
-  if (!content) {
-    throw new Error("LM Studio chat response did not include content");
+    if (!response.ok) {
+      throw new LmStudioRequestError(response.status, await response.text());
+    }
+
+    const data = (await response.json()) as ChatCompletionResponse;
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error("LM Studio chat response did not include content");
+    }
+    return content;
   }
 
-  return content;
+  let attempt = 0;
+  while (attempt <= maxRetries) {
+    try {
+      return await request({
+        type: "json_schema",
+        json_schema: STORY_METADATA_JSON_SCHEMA,
+      });
+    } catch (error) {
+      if (error instanceof LmStudioRequestError && error.status === 400) {
+        try {
+          return await request({ type: "text" });
+        } catch (textError) {
+          if (attempt >= maxRetries || !isRetryable(textError)) {
+            throw textError;
+          }
+        }
+      } else if (attempt >= maxRetries || !isRetryable(error)) {
+        throw error;
+      }
+
+      const backoffMs = Math.min(750 * 2 ** attempt, 5000);
+      await sleep(backoffMs);
+      attempt += 1;
+    }
+  }
+
+  throw new Error("LM Studio chat request retries exhausted");
 }
 
 export async function extractStoryMetadata(
@@ -137,19 +227,33 @@ Analyze the story text below and return only JSON.
 
 ${textForModel}`;
 
-  const raw = await callChatCompletion(config.lmStudioBaseUrl, config.lmStudioApiKey, config.lmStudioMetadataModel, [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
-  ]);
+  const raw = await callChatCompletion(
+    config.lmStudioBaseUrl,
+    config.lmStudioApiKey,
+    config.lmStudioMetadataModel,
+    config.lmStudioTimeoutMs,
+    config.lmStudioMaxRetries,
+    [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+  );
 
   try {
     return normalizeMetadata(JSON.parse(extractJson(raw)));
   } catch {
     const repairPrompt = `Fix this so it is valid JSON for the required schema and return JSON only:\n\n${raw}`;
-    const repaired = await callChatCompletion(config.lmStudioBaseUrl, config.lmStudioApiKey, config.lmStudioMetadataModel, [
-      { role: "system", content: "Return valid JSON only. No prose." },
-      { role: "user", content: repairPrompt },
-    ]);
+    const repaired = await callChatCompletion(
+      config.lmStudioBaseUrl,
+      config.lmStudioApiKey,
+      config.lmStudioMetadataModel,
+      config.lmStudioTimeoutMs,
+      config.lmStudioMaxRetries,
+      [
+        { role: "system", content: "Return valid JSON only. No prose." },
+        { role: "user", content: repairPrompt },
+      ],
+    );
 
     return normalizeMetadata(JSON.parse(extractJson(repaired)));
   }

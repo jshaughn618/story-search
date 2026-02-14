@@ -392,9 +392,18 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       }
 
       const shouldRunAi = ingest.status === "OK";
-      const metadata = shouldRunAi
-        ? await extractStoryMetadata(config, ingest.normalizedText, ingest.sourcePath)
-        : fallbackMetadata(ingest.sourcePath, ingest.status, ingest.statusNotes);
+      let metadata = fallbackMetadata(ingest.sourcePath, ingest.status, ingest.statusNotes);
+      let metadataFailureNote: string | null = null;
+      if (shouldRunAi) {
+        try {
+          metadata = await extractStoryMetadata(config, ingest.normalizedText, ingest.sourcePath);
+        } catch (metadataError) {
+          const message = metadataError instanceof Error ? metadataError.message : "unknown metadata error";
+          metadataFailureNote = `Metadata extraction fallback used: ${message}`;
+          metadata = fallbackMetadata(ingest.sourcePath, ingest.status, metadataFailureNote);
+          console.warn(`! metadata fallback: ${ingest.sourcePath} (${message})`);
+        }
+      }
 
       const chunks = chunkText(ingest.normalizedText, {
         chunkSizeChars: config.chunkSizeChars,
@@ -442,6 +451,12 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         chunksKey,
         updatedAt: ingestedAt,
       };
+
+      if (metadataFailureNote) {
+        indexedStory.statusNotes = indexedStory.statusNotes
+          ? `${indexedStory.statusNotes} | ${metadataFailureNote}`
+          : metadataFailureNote;
+      }
 
       await client.upsertStory(indexedStory);
       await client.replaceStoryTags(storyId, shouldRunAi ? metadata.tags : []);

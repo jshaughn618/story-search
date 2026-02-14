@@ -143,6 +143,8 @@ Important env vars:
 - `CF_ACCOUNT_ID`
 - `CF_API_TOKEN`
 - `CF_AI_EMBED_MODEL=@cf/baai/bge-base-en-v1.5`
+- `LMSTUDIO_TIMEOUT_MS=120000`
+- `LMSTUDIO_MAX_RETRIES=2`
 - `INDEXER_ACCEPT_EXTENSIONS=.txt,.html,.htm,.rtf,.doc,.docx,.pdf`
 - `MIN_EXTRACT_CHARS=500`
 - `PDF_MIN_TEXT_CHARS=800`

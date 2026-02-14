@@ -66,6 +66,8 @@ export function loadConfig(): IndexerConfig {
     lmStudioBaseUrl: (process.env.LMSTUDIO_BASE_URL ?? "http://localhost:1234/v1").replace(/\/+$/, ""),
     lmStudioApiKey: process.env.LMSTUDIO_API_KEY ?? "lm-studio",
     lmStudioMetadataModel: process.env.LMSTUDIO_METADATA_MODEL ?? "local-metadata-model",
+    lmStudioTimeoutMs: asNumber("LMSTUDIO_TIMEOUT_MS", 120000),
+    lmStudioMaxRetries: asNumber("LMSTUDIO_MAX_RETRIES", 2),
     cfAiEmbedModel: process.env.CF_AI_EMBED_MODEL ?? DEFAULT_CF_AI_EMBED_MODEL,
     cloudflareAccountId: accountId,
     cloudflareApiToken: apiToken,
