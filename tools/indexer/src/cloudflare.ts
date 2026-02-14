@@ -123,7 +123,7 @@ export class CloudflareClient {
   async upsertStory(story: IndexedStory) {
     await this.d1Exec(
       `
-      INSERT OR REPLACE INTO STORIES (
+      INSERT INTO STORIES (
         STORY_ID, SOURCE_PATH, CONTENT_HASH, RAW_HASH, CANON_HASH, STORY_STATUS,
         SOURCE_COUNT, CANON_TEXT_SOURCE, EXTRACT_METHOD, STATUS_NOTES,
         TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG,
@@ -131,6 +131,31 @@ export class CloudflareClient {
         WORD_COUNT, CHUNK_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(STORY_ID) DO UPDATE SET
+        SOURCE_PATH = excluded.SOURCE_PATH,
+        CONTENT_HASH = excluded.CONTENT_HASH,
+        RAW_HASH = excluded.RAW_HASH,
+        CANON_HASH = excluded.CANON_HASH,
+        STORY_STATUS = excluded.STORY_STATUS,
+        SOURCE_COUNT = excluded.SOURCE_COUNT,
+        CANON_TEXT_SOURCE = excluded.CANON_TEXT_SOURCE,
+        EXTRACT_METHOD = excluded.EXTRACT_METHOD,
+        STATUS_NOTES = excluded.STATUS_NOTES,
+        TITLE = excluded.TITLE,
+        AUTHOR = excluded.AUTHOR,
+        SUMMARY_SHORT = excluded.SUMMARY_SHORT,
+        SUMMARY_LONG = excluded.SUMMARY_LONG,
+        GENRE = excluded.GENRE,
+        TONE = excluded.TONE,
+        SETTING = excluded.SETTING,
+        TAGS_JSON = excluded.TAGS_JSON,
+        THEMES_JSON = excluded.THEMES_JSON,
+        CONTENT_NOTES_JSON = excluded.CONTENT_NOTES_JSON,
+        WORD_COUNT = excluded.WORD_COUNT,
+        CHUNK_COUNT = excluded.CHUNK_COUNT,
+        R2_KEY = excluded.R2_KEY,
+        CHUNKS_KEY = excluded.CHUNKS_KEY,
+        UPDATED_AT = excluded.UPDATED_AT
       `,
       [
         story.storyId,

@@ -14,3 +14,6 @@ tools/indexer/reports/
 # Keep sample fixtures tracked, ignore large corpus files.
 *.txt
 !sample_stories/*.txt
+
+ingest_summary.json
+*.csv

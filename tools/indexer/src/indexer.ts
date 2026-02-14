@@ -351,7 +351,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
 
       extractedWordCounts.push(countWords(ingest.normalizedText));
 
-      const storyId = createStoryId(ingest.canonHash);
+      const derivedStoryId = createStoryId(ingest.canonHash);
       const previousSource = await client.getSourceByPath(ingest.sourcePath);
 
       if (options.changedOnly && previousSource?.RAW_HASH === ingest.rawHash) {
@@ -360,26 +360,10 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         continue;
       }
 
-      await fs.writeFile(path.join(config.outputTextDir, `${storyId}.txt`), ingest.normalizedText, "utf8");
-
       const existingCanonical = await client.getStoryByCanonHash(ingest.canonHash);
+      const storyId = existingCanonical?.STORY_ID ?? derivedStoryId;
       const ingestedAt = new Date().toISOString();
-
-      await client.upsertStorySource({
-        storyId,
-        sourcePath: ingest.sourcePath,
-        rawHash: ingest.rawHash,
-        ingestedAt,
-        sourceType: ingest.sourceType,
-        extractMethod: ingest.extractMethod,
-        titleFromSource: ingest.titleFromSource,
-      });
-
-      if (previousSource && previousSource.STORY_ID !== storyId) {
-        await client.deleteStoryIfOrphan(previousSource.STORY_ID);
-      }
-
-      const sourceCount = await client.refreshSourceCount(storyId);
+      await fs.writeFile(path.join(config.outputTextDir, `${storyId}.txt`), ingest.normalizedText, "utf8");
 
       if (config.storeOriginalBinary) {
         const originalKey = `sources/original/${storyId}/${Buffer.from(ingest.sourcePath).toString("hex")}${path.extname(filePath).toLowerCase()}`;
@@ -387,6 +371,21 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       }
 
       if (existingCanonical) {
+        await client.upsertStorySource({
+          storyId,
+          sourcePath: ingest.sourcePath,
+          rawHash: ingest.rawHash,
+          ingestedAt,
+          sourceType: ingest.sourceType,
+          extractMethod: ingest.extractMethod,
+          titleFromSource: ingest.titleFromSource,
+        });
+
+        if (previousSource && previousSource.STORY_ID !== storyId) {
+          await client.deleteStoryIfOrphan(previousSource.STORY_ID);
+        }
+
+        await client.refreshSourceCount(storyId);
         summary.deduped += 1;
         console.log(`= deduped: ${ingest.sourcePath} -> ${storyId}`);
         continue;
@@ -423,7 +422,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         rawHash: ingest.rawHash,
         canonHash: ingest.canonHash,
         storyStatus: ingest.status,
-        sourceCount,
+        sourceCount: 1,
         canonTextSource: ingest.sourceType,
         extractMethod: ingest.extractMethod,
         statusNotes: ingest.statusNotes,
@@ -446,6 +445,21 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
 
       await client.upsertStory(indexedStory);
       await client.replaceStoryTags(storyId, shouldRunAi ? metadata.tags : []);
+      await client.upsertStorySource({
+        storyId,
+        sourcePath: ingest.sourcePath,
+        rawHash: ingest.rawHash,
+        ingestedAt,
+        sourceType: ingest.sourceType,
+        extractMethod: ingest.extractMethod,
+        titleFromSource: ingest.titleFromSource,
+      });
+
+      if (previousSource && previousSource.STORY_ID !== storyId) {
+        await client.deleteStoryIfOrphan(previousSource.STORY_ID);
+      }
+
+      await client.refreshSourceCount(storyId);
 
       if (shouldRunAi) {
         const embeddings = await embedInBatches(
