@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.wrangler/
+.DS_Store
+.env
+.env.*
+*.log
+*.zip
+*.tsbuildinfo
+tools/indexer/output_text/
+tools/indexer/output_reports/
+tools/indexer/reports/
+
+# Keep sample fixtures tracked, ignore large corpus files.
+*.txt
+!sample_stories/*.txt
