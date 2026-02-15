@@ -13,6 +13,7 @@ import type {
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
 const DEFAULT_STATUSES: StoryStatus[] = ["OK"];
+const VECTOR_MAX_TOPK_WITH_ALL_METADATA = 50;
 
 interface VectorMatch {
   id: string;
@@ -224,7 +225,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       vectorFilter.storyStatus = filters.statuses[0];
     }
 
-    const topK = Math.min(Math.max(limit * 5, 40), 120);
+    const topK = Math.min(
+      Math.min(Math.max(limit * 5, 40), 120),
+      VECTOR_MAX_TOPK_WITH_ALL_METADATA,
+    );
     const vectorQuery = await env.STORY_VECTORS.query(queryVector, {
       topK,
       returnMetadata: "all",

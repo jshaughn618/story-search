@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { fetchStory } from "../lib/api";
+import { deleteStory, fetchStory } from "../lib/api";
 import {
   defaultReaderPreferences,
   loadReaderPreferences,
@@ -27,6 +27,7 @@ export function ReaderPage() {
   const [data, setData] = useState<StoryDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [highlightedParagraph, setHighlightedParagraph] = useState<number | null>(null);
   const [preferences, setPreferences] = useState<ReaderPreferences>(() => {
     if (typeof window === "undefined") {
@@ -129,6 +130,33 @@ export function ReaderPage() {
 
   const backTo = (location.state as { from?: string } | null)?.from;
 
+  const handleDeleteStory = async () => {
+    if (!id || !data || deleting) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${data.story.title}"?\n\nThis will remove it from D1, R2, and Vectorize.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteStory(id);
+      if (backTo) {
+        navigate(backTo, { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : "Failed to delete story";
+      window.alert(message);
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return <main className="reader-page">Loading story...</main>;
   }
@@ -140,8 +168,12 @@ export function ReaderPage() {
   return (
     <main className={`reader-page theme-${preferences.theme}`} style={style}>
       <header className="reader-toolbar">
-        <button type="button" onClick={() => (backTo ? navigate(backTo) : navigate(-1))}>
+        <button type="button" onClick={() => (backTo ? navigate(backTo) : navigate(-1))} disabled={deleting}>
           Back to results
+        </button>
+
+        <button type="button" className="danger-button" onClick={handleDeleteStory} disabled={deleting}>
+          {deleting ? "Deleting..." : "Delete story"}
         </button>
 
         <div className="reader-controls">

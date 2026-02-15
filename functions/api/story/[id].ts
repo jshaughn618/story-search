@@ -2,6 +2,118 @@ import { errorResponse, json } from "../../_lib/http";
 import { mapStory } from "../../_lib/story";
 import type { ChunkMapItem, Env, StoryRow } from "../../_lib/types";
 
+interface StoryDeleteRow {
+  STORY_ID: string;
+  R2_KEY: string;
+  CHUNKS_KEY: string | null;
+  CHUNK_COUNT: number;
+}
+
+interface VectorMatchId {
+  id: string;
+}
+
+const VECTOR_DELETE_BATCH_SIZE = 500;
+const VECTOR_QUERY_TOP_K = 50;
+const VECTOR_CLEANUP_MAX_PASSES = 200;
+
+async function resolveVectorDimensions(env: Env): Promise<number | null> {
+  try {
+    const indexInfo = (await env.STORY_VECTORS.describe()) as {
+      dimensions?: number;
+      config?: { dimensions?: number };
+    };
+
+    if (typeof indexInfo.dimensions === "number" && indexInfo.dimensions > 0) {
+      return indexInfo.dimensions;
+    }
+
+    if (typeof indexInfo.config?.dimensions === "number" && indexInfo.config.dimensions > 0) {
+      return indexInfo.config.dimensions;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn("Could not determine Vectorize dimensions", error);
+    return null;
+  }
+}
+
+async function deleteKnownChunkVectors(env: Env, storyId: string, chunkCount: number): Promise<number> {
+  if (chunkCount <= 0) {
+    return 0;
+  }
+
+  let deleted = 0;
+  for (let start = 0; start < chunkCount; start += VECTOR_DELETE_BATCH_SIZE) {
+    const end = Math.min(start + VECTOR_DELETE_BATCH_SIZE, chunkCount);
+    const ids: string[] = [];
+
+    for (let index = start; index < end; index += 1) {
+      ids.push(`${storyId}:${String(index).padStart(5, "0")}`);
+    }
+
+    await env.STORY_VECTORS.deleteByIds(ids);
+    deleted += ids.length;
+  }
+
+  return deleted;
+}
+
+async function cleanupRemainingStoryVectors(env: Env, storyId: string): Promise<number> {
+  const dimensions = await resolveVectorDimensions(env);
+  if (!dimensions || dimensions <= 0) {
+    return 0;
+  }
+
+  const probeVector = new Array<number>(dimensions).fill(0);
+  let deleted = 0;
+
+  for (let pass = 0; pass < VECTOR_CLEANUP_MAX_PASSES; pass += 1) {
+    const result = await env.STORY_VECTORS.query(probeVector, {
+      topK: VECTOR_QUERY_TOP_K,
+      returnValues: false,
+      returnMetadata: "indexed",
+      filter: { storyId },
+    });
+
+    const ids = [...new Set(((result.matches ?? []) as VectorMatchId[]).map((match) => match.id).filter(Boolean))];
+    if (ids.length === 0) {
+      break;
+    }
+
+    await env.STORY_VECTORS.deleteByIds(ids);
+    deleted += ids.length;
+  }
+
+  return deleted;
+}
+
+async function deleteStoryR2Objects(env: Env, story: StoryDeleteRow): Promise<number> {
+  let deleted = 0;
+
+  const keys = [story.R2_KEY, story.CHUNKS_KEY].filter((value): value is string => Boolean(value));
+  if (keys.length > 0) {
+    await env.STORY_BUCKET.delete(keys);
+    deleted += keys.length;
+  }
+
+  const originalPrefix = `sources/original/${story.STORY_ID}/`;
+  let cursor: string | undefined;
+
+  do {
+    const listed = await env.STORY_BUCKET.list({ prefix: originalPrefix, cursor });
+    const originalKeys = listed.objects.map((object) => object.key);
+    if (originalKeys.length > 0) {
+      await env.STORY_BUCKET.delete(originalKeys);
+      deleted += originalKeys.length;
+    }
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
+
+  return deleted;
+}
+
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, request }) => {
   try {
     const storyParam = params.id;
@@ -64,5 +176,49 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request })
   } catch (error) {
     console.error("/api/story/:id error", error);
     return errorResponse("Failed to load story", 500);
+  }
+};
+
+export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
+  try {
+    const storyParam = params.id;
+    const storyId = typeof storyParam === "string" ? storyParam.trim() : "";
+    if (!storyId) {
+      return errorResponse("Missing story id", 400);
+    }
+
+    const story = await env.STORY_DB.prepare(
+      `
+      SELECT STORY_ID, R2_KEY, CHUNKS_KEY, CHUNK_COUNT
+      FROM STORIES
+      WHERE STORY_ID = ?
+    `,
+    )
+      .bind(storyId)
+      .first<StoryDeleteRow>();
+
+    if (!story) {
+      return errorResponse("Story not found", 404);
+    }
+
+    const deletedKnownVectors = await deleteKnownChunkVectors(env, storyId, story.CHUNK_COUNT);
+    const deletedCleanupVectors = await cleanupRemainingStoryVectors(env, storyId);
+    const deletedR2Objects = await deleteStoryR2Objects(env, story);
+
+    await env.STORY_DB.prepare("DELETE FROM STORIES WHERE STORY_ID = ?").bind(storyId).run();
+    await env.STORY_DB.prepare("DELETE FROM TAGS WHERE TAG NOT IN (SELECT DISTINCT TAG FROM STORY_TAGS)").run();
+
+    return json({
+      ok: true,
+      storyId,
+      deleted: {
+        vectors: deletedKnownVectors + deletedCleanupVectors,
+        r2Objects: deletedR2Objects,
+        storyRecord: 1,
+      },
+    });
+  } catch (error) {
+    console.error("/api/story/:id delete error", error);
+    return errorResponse("Failed to delete story", 500);
   }
 };

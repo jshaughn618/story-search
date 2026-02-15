@@ -1,4 +1,10 @@
-import type { FiltersResponse, SearchRequest, SearchResponse, StoryDetailResponse } from "../types";
+import type {
+  DeleteStoryResponse,
+  FiltersResponse,
+  SearchRequest,
+  SearchResponse,
+  StoryDetailResponse,
+} from "../types";
 
 async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -45,4 +51,10 @@ export function fetchStory(storyId: string, chunk?: number | null) {
   const query = params.toString();
   const path = query ? `/api/story/${storyId}?${query}` : `/api/story/${storyId}`;
   return apiRequest<StoryDetailResponse>(path);
+}
+
+export function deleteStory(storyId: string) {
+  return apiRequest<DeleteStoryResponse>(`/api/story/${storyId}`, {
+    method: "DELETE",
+  });
 }

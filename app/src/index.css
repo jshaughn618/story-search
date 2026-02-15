@@ -104,9 +104,18 @@ a {
 }
 
 .search-form button:disabled,
-.pagination-row button:disabled {
+.pagination-row button:disabled,
+.reader-toolbar button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.reader-toolbar .danger-button {
+  background: #8e2f2f;
+}
+
+.reader-toolbar .danger-button:hover:not(:disabled) {
+  background: #762323;
 }
 
 .filter-row {

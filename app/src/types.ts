@@ -81,6 +81,16 @@ export interface StoryDetailResponse {
   anchor: ChunkMapItem | null;
 }
 
+export interface DeleteStoryResponse {
+  ok: boolean;
+  storyId: string;
+  deleted: {
+    vectors: number;
+    r2Objects: number;
+    storyRecord: number;
+  };
+}
+
 export type ReaderTheme = "light" | "dark" | "sepia";
 export type ReaderWidth = "narrow" | "medium" | "wide";
 export type ReaderLineHeight = "compact" | "normal" | "relaxed";

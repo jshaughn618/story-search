@@ -57,12 +57,22 @@ For each file:
 
 Reader view always renders canonical text from R2.
 
+## Story Deletion
+
+- Reader view includes a `Delete story` action.
+- API endpoint: `DELETE /api/story/:id`
+- Deletion removes:
+  - D1 story record (with cascaded `STORY_SOURCES`/`STORY_TAGS`)
+  - R2 canonical text + chunk map + optional originals under `sources/original/{storyId}/`
+  - Vectorize chunk vectors for the story
+
 ## D1 Schema
 
 Migrations:
 - `db/migrations/0001_init.sql`
 - `db/migrations/0002_cleanup_dedupe.sql`
 - `db/migrations/0003_settings.sql`
+- `db/migrations/0004_add_author.sql`
 
 `STORIES` includes:
 - `RAW_HASH`
