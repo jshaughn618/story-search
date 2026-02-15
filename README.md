@@ -47,10 +47,13 @@ For each file:
 4. Compute:
    - `RAW_HASH = sha256(original bytes)`
    - `CANON_HASH = sha256(normalized canonical text)`
-5. Dedupe by `CANON_HASH`
-6. If new canonical story:
+5. Deterministic header-tag extraction (indexer-side, not LLM-side):
+   - scans header lines for a trailing parenthesized tag-code list
+   - stores `HEADER_TAG_CODES_JSON` in D1
+6. Dedupe by `CANON_HASH`
+7. If new canonical story:
    - metadata via LM Studio (strict JSON)
-   - chunk + Workers AI embeddings
+   - chunk + Workers AI embeddings (**BODY-only chunks**)
    - upload canonical text + chunk map to R2
    - upsert metadata/status to D1
    - upsert vectors to Vectorize (batched and byte-limited <100MB)
@@ -59,10 +62,11 @@ Reader view always renders canonical text from R2.
 
 ## Story Deletion
 
-- Reader view includes a `Delete story` action.
+- Story list/search cards include a `...` menu with `Delete`.
+- Reader view intentionally has no delete controls.
 - API endpoint: `DELETE /api/story/:id`
 - Deletion removes:
-  - D1 story record (with cascaded `STORY_SOURCES`/`STORY_TAGS`)
+  - D1 story record + related source/tag rows
   - R2 canonical text + chunk map + optional originals under `sources/original/{storyId}/`
   - Vectorize chunk vectors for the story
 
@@ -73,6 +77,8 @@ Migrations:
 - `db/migrations/0002_cleanup_dedupe.sql`
 - `db/migrations/0003_settings.sql`
 - `db/migrations/0004_add_author.sql`
+- `db/migrations/0005_chunk_count_hardening.sql`
+- `db/migrations/0006_header_tag_codes.sql`
 
 `STORIES` includes:
 - `RAW_HASH`
@@ -82,6 +88,8 @@ Migrations:
 - `STORY_STATUS`
 - `STATUS_NOTES`
 - `SOURCE_COUNT`
+- `CHUNK_COUNT`
+- `HEADER_TAG_CODES_JSON`
 
 `STORY_SOURCES` includes:
 - `STORY_ID`

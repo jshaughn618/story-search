@@ -50,6 +50,7 @@ export interface IndexedStory {
   contentHash: string;
   rawHash: string;
   canonHash: string;
+  headerTagCodes: string[];
   storyStatus: StoryStatus;
   sourceCount: number;
   canonTextSource: SourceType;
@@ -176,6 +177,10 @@ export interface IngestedSource {
   extractMethod: ExtractMethod;
   titleFromSource: string | null;
   normalizedText: string;
+  headerText: string;
+  bodyText: string;
+  bodyStartChar: number;
+  headerTagCodes: string[];
   rawHash: string;
   canonHash: string | null;
   status: StoryStatus;
@@ -200,6 +205,13 @@ export interface ExtractionFailureItem {
   sourcePath: string;
   sourceType: SourceType;
   errorMessage: string;
+}
+
+export interface MetadataInput {
+  sourcePath: string;
+  headerTagCodes: string[];
+  headerText: string;
+  bodyText: string;
 }
 
 export interface CleanupSummary {

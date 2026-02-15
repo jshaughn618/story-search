@@ -6,6 +6,16 @@ import type {
   StoryDetailResponse,
 } from "../types";
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
@@ -25,7 +35,7 @@ async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
     } catch {
       // noop
     }
-    throw new Error(errorText);
+    throw new ApiError(errorText, response.status);
   }
 
   return (await response.json()) as T;

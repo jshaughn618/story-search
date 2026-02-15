@@ -84,11 +84,6 @@ export interface StoryDetailResponse {
 export interface DeleteStoryResponse {
   ok: boolean;
   storyId: string;
-  deleted: {
-    vectors: number;
-    r2Objects: number;
-    storyRecord: number;
-  };
 }
 
 export type ReaderTheme = "light" | "dark" | "sepia";

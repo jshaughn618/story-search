@@ -6,7 +6,7 @@ interface StoryDeleteRow {
   STORY_ID: string;
   R2_KEY: string;
   CHUNKS_KEY: string | null;
-  CHUNK_COUNT: number;
+  CHUNK_COUNT: number | null;
 }
 
 interface VectorMatchId {
@@ -16,6 +16,17 @@ interface VectorMatchId {
 const VECTOR_DELETE_BATCH_SIZE = 500;
 const VECTOR_QUERY_TOP_K = 50;
 const VECTOR_CLEANUP_MAX_PASSES = 200;
+
+async function runDeleteIfTableExists(env: Env, sql: string, storyId: string): Promise<void> {
+  try {
+    await env.STORY_DB.prepare(sql).bind(storyId).run();
+  } catch (error) {
+    if (error instanceof Error && error.message.toLowerCase().includes("no such table")) {
+      return;
+    }
+    throw error;
+  }
+}
 
 async function resolveVectorDimensions(env: Env): Promise<number | null> {
   try {
@@ -201,24 +212,23 @@ export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
       return errorResponse("Story not found", 404);
     }
 
-    const deletedKnownVectors = await deleteKnownChunkVectors(env, storyId, story.CHUNK_COUNT);
-    const deletedCleanupVectors = await cleanupRemainingStoryVectors(env, storyId);
-    const deletedR2Objects = await deleteStoryR2Objects(env, story);
+    const chunkCount = Math.max(0, story.CHUNK_COUNT ?? 0);
+    await deleteKnownChunkVectors(env, storyId, chunkCount);
+    await cleanupRemainingStoryVectors(env, storyId);
+    await deleteStoryR2Objects(env, story);
 
+    await runDeleteIfTableExists(env, "DELETE FROM STORY_SOURCES WHERE STORY_ID = ?", storyId);
+    await runDeleteIfTableExists(env, "DELETE FROM STORY_TAGS WHERE STORY_ID = ?", storyId);
     await env.STORY_DB.prepare("DELETE FROM STORIES WHERE STORY_ID = ?").bind(storyId).run();
     await env.STORY_DB.prepare("DELETE FROM TAGS WHERE TAG NOT IN (SELECT DISTINCT TAG FROM STORY_TAGS)").run();
 
     return json({
       ok: true,
       storyId,
-      deleted: {
-        vectors: deletedKnownVectors + deletedCleanupVectors,
-        r2Objects: deletedR2Objects,
-        storyRecord: 1,
-      },
     });
   } catch (error) {
     console.error("/api/story/:id delete error", error);
-    return errorResponse("Failed to delete story", 500);
+    const message = error instanceof Error ? error.message : "Failed to delete story";
+    return errorResponse(message, 500);
   }
 };

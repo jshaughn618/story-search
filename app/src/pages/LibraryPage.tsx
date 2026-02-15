@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { fetchFilters, searchStories } from "../lib/api";
+import { deleteStory, fetchFilters, searchStories } from "../lib/api";
 import type { FiltersResponse, SearchResponse, StoryResult, StoryStatus } from "../types";
 
 const PAGE_SIZE = 20;
+const DELETE_CONFIRM_TOKEN = "DELETE";
 
 type StatusFilterValue = StoryStatus | "ALL";
 
@@ -27,6 +28,7 @@ const statusLabel: Record<StatusFilterValue, string> = {
 
 export function LibraryPage() {
   const location = useLocation();
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [filters, setFilters] = useState<FiltersResponse>(emptyFilters);
   const [query, setQuery] = useState("");
   const [genre, setGenre] = useState<string>("");
@@ -39,6 +41,11 @@ export function LibraryPage() {
   const [offset, setOffset] = useState(0);
   const [totalCandidates, setTotalCandidates] = useState<number | undefined>(undefined);
   const [debugScores, setDebugScores] = useState(false);
+  const [openMenuStoryId, setOpenMenuStoryId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StoryResult | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,6 +114,106 @@ export function LibraryPage() {
     setTone("");
     setSelectedTags([]);
     setStatusFilter("OK");
+  };
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setToast(null);
+    }, 3200);
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [toast]);
+
+  useEffect(() => {
+    if (!openMenuStoryId) {
+      return;
+    }
+
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
+        setOpenMenuStoryId(null);
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenMenuStoryId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openMenuStoryId]);
+
+  useEffect(() => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeDeleteDialog();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [deleteTarget, deletingStoryId]);
+
+  const openDeleteDialog = (story: StoryResult) => {
+    setDeleteTarget(story);
+    setDeleteConfirmText("");
+    setOpenMenuStoryId(null);
+  };
+
+  const closeDeleteDialog = () => {
+    if (deletingStoryId) {
+      return;
+    }
+    setDeleteTarget(null);
+    setDeleteConfirmText("");
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || deletingStoryId) {
+      return;
+    }
+
+    const storyId = deleteTarget.storyId;
+    const previousResults = results;
+    const previousTotalCandidates = totalCandidates;
+
+    setDeletingStoryId(storyId);
+    setResults((current) => current.filter((item) => item.storyId !== storyId));
+    setTotalCandidates((current) =>
+      typeof current === "number" ? Math.max(0, current - 1) : current,
+    );
+
+    try {
+      await deleteStory(storyId);
+      setToast("Story deleted.");
+      setDeleteTarget(null);
+      setDeleteConfirmText("");
+    } catch (deleteError) {
+      setResults(previousResults);
+      setTotalCandidates(previousTotalCandidates);
+      const message = deleteError instanceof Error ? deleteError.message : "Failed to delete story";
+      setToast(`Delete failed: ${message}`);
+    } finally {
+      setDeletingStoryId(null);
+    }
   };
 
   return (
@@ -222,20 +329,53 @@ export function LibraryPage() {
 
         {results.map((story) => {
           const chunkQuery = story.bestChunk ? `?chunk=${story.bestChunk.chunkIndex}` : "";
+          const menuOpen = openMenuStoryId === story.storyId;
+          const deleting = deletingStoryId === story.storyId;
           return (
             <article key={story.storyId} className="story-card">
-              <header>
-                <h2>
-                  <Link
-                    to={`/story/${story.storyId}${chunkQuery}`}
-                    state={{ from: `${location.pathname}${location.search}` }}
+              <header className="story-head">
+                <div className="story-head-main">
+                  <h2>
+                    <Link
+                      to={`/story/${story.storyId}${chunkQuery}`}
+                      state={{ from: `${location.pathname}${location.search}` }}
+                    >
+                      {story.title}
+                    </Link>
+                  </h2>
+                  <p className="story-meta">
+                    {story.genre || "Unknown genre"} • {story.tone || "Unknown tone"} • {story.wordCount} words • {story.storyStatus}
+                  </p>
+                </div>
+
+                <div className="story-menu-wrap" ref={menuOpen ? menuRef : null}>
+                  <button
+                    type="button"
+                    className="kebab-button"
+                    aria-label={`Open story actions for ${story.title}`}
+                    aria-haspopup="menu"
+                    aria-expanded={menuOpen}
+                    disabled={deleting}
+                    onClick={() =>
+                      setOpenMenuStoryId((current) => (current === story.storyId ? null : story.storyId))
+                    }
                   >
-                    {story.title}
-                  </Link>
-                </h2>
-                <p className="story-meta">
-                  {story.genre || "Unknown genre"} • {story.tone || "Unknown tone"} • {story.wordCount} words • {story.storyStatus}
-                </p>
+                    ⋯
+                  </button>
+
+                  {menuOpen ? (
+                    <div className="story-menu" role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="story-menu-item danger"
+                        onClick={() => openDeleteDialog(story)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </header>
 
               {story.summaryShort ? <p>{story.summaryShort}</p> : null}
@@ -266,6 +406,46 @@ export function LibraryPage() {
           );
         })}
       </section>
+
+      {deleteTarget ? (
+        <div className="confirm-backdrop" role="presentation" onClick={closeDeleteDialog}>
+          <div
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="delete-dialog-title">Delete story?</h3>
+            <p>This will permanently delete the story and its index. This can&apos;t be undone.</p>
+            <label>
+              Type {DELETE_CONFIRM_TOKEN} to confirm
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(event) => setDeleteConfirmText(event.target.value)}
+                autoComplete="off"
+                autoFocus
+              />
+            </label>
+            <div className="confirm-actions">
+              <button type="button" className="ghost" onClick={closeDeleteDialog} disabled={Boolean(deletingStoryId)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="danger-button"
+                disabled={deleteConfirmText !== DELETE_CONFIRM_TOKEN || Boolean(deletingStoryId)}
+                onClick={() => void confirmDelete()}
+              >
+                {deletingStoryId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? <div className="toast">{toast}</div> : null}
 
       <nav className="pagination-row">
         <button

@@ -110,12 +110,15 @@ a {
   cursor: not-allowed;
 }
 
-.reader-toolbar .danger-button {
+.danger-button {
   background: #8e2f2f;
+  border-color: #8e2f2f;
+  color: #fff;
 }
 
-.reader-toolbar .danger-button:hover:not(:disabled) {
+.danger-button:hover:not(:disabled) {
   background: #762323;
+  border-color: #762323;
 }
 
 .filter-row {
@@ -205,10 +208,69 @@ a {
   text-decoration: underline;
 }
 
+.story-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.story-head-main {
+  min-width: 0;
+}
+
 .story-meta {
   margin: 0.4rem 0 0;
   font-size: 0.9rem;
   color: var(--muted);
+}
+
+.story-menu-wrap {
+  position: relative;
+}
+
+.kebab-button {
+  border: 1px solid #aeb5b4;
+  background: #fff;
+  color: #1f3538;
+  border-radius: 10px;
+  width: 2.1rem;
+  height: 2rem;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.story-menu {
+  position: absolute;
+  right: 0;
+  top: 2.25rem;
+  min-width: 140px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.35rem;
+  box-shadow: 0 8px 24px rgba(12, 21, 24, 0.14);
+  z-index: 20;
+}
+
+.story-menu-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.story-menu-item:hover {
+  background: #f3f6f6;
+}
+
+.story-menu-item.danger {
+  color: #8e2f2f;
 }
 
 .story-card blockquote {
@@ -259,10 +321,90 @@ a {
   padding: 0.8rem;
 }
 
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 22, 26, 0.42);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+  padding: 1rem;
+}
+
+.confirm-dialog {
+  width: min(440px, 100%);
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  padding: 1rem;
+}
+
+.confirm-dialog h3 {
+  margin: 0 0 0.55rem;
+  font-family: "Literata", serif;
+}
+
+.confirm-dialog p {
+  margin: 0 0 0.8rem;
+  color: var(--muted);
+}
+
+.confirm-dialog label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.confirm-dialog input {
+  border: 1px solid #c2c0ba;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+}
+
+.confirm-actions {
+  margin-top: 0.9rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.toast {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  max-width: min(420px, calc(100vw - 2rem));
+  background: #1c2a2e;
+  color: #fff;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(13, 17, 21, 0.28);
+  z-index: 70;
+}
+
 .reader-page {
   min-height: 100vh;
   padding: 1rem;
   transition: background-color 180ms ease, color 180ms ease;
+}
+
+.reader-not-found {
+  max-width: 640px;
+  margin: 6rem auto;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+}
+
+.reader-not-found h1 {
+  margin: 0;
+  font-family: "Literata", serif;
+}
+
+.reader-not-found p {
+  margin: 0.7rem 0 1rem;
+  color: var(--muted);
 }
 
 .reader-toolbar {

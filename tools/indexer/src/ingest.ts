@@ -23,6 +23,112 @@ function normalizeToUtf8(text: string): string {
   return Buffer.from(text, "utf8").toString("utf8");
 }
 
+const HEADER_TAG_LINE_REGEX = /\(([^\)\n]{3,200})\)\s*[.!?"]?\s*$/;
+const MAX_HEADER_SCAN_LINES = 60;
+
+function dedupeTokens(tokens: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const token of tokens) {
+    const key = token.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(token);
+  }
+  return output;
+}
+
+function parseHeaderTagCodes(rawList: string): string[] {
+  if (!rawList.includes(",")) {
+    return [];
+  }
+
+  const tokens = rawList
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  if (tokens.length < 2 || tokens.length > 20) {
+    return [];
+  }
+
+  if (tokens.some((token) => token.length > 40)) {
+    return [];
+  }
+
+  return dedupeTokens(tokens);
+}
+
+function splitHeaderAndBody(canonicalText: string): {
+  headerText: string;
+  headerTagCodes: string[];
+  bodyText: string;
+  bodyStartChar: number;
+} {
+  const lines = canonicalText.split("\n");
+  const lineOffsets: number[] = [];
+  let cursor = 0;
+  for (const line of lines) {
+    lineOffsets.push(cursor);
+    cursor += line.length + 1;
+  }
+
+  const scanLimit = Math.min(lines.length, MAX_HEADER_SCAN_LINES);
+  let headerEndLine = scanLimit;
+  for (let index = 0; index < scanLimit; index += 1) {
+    if (lines[index].trim() === "") {
+      headerEndLine = index;
+      break;
+    }
+  }
+
+  let bodyLineIndex = headerEndLine;
+  while (bodyLineIndex < lines.length && lines[bodyLineIndex].trim() === "") {
+    bodyLineIndex += 1;
+  }
+
+  const headerLines = lines.slice(0, headerEndLine);
+  let headerTagCodes: string[] = [];
+  for (let index = headerLines.length - 1; index >= 0; index -= 1) {
+    const line = headerLines[index].trim();
+    if (!line) {
+      continue;
+    }
+
+    const match = line.match(HEADER_TAG_LINE_REGEX);
+    if (!match) {
+      continue;
+    }
+
+    const parsed = parseHeaderTagCodes(match[1]);
+    if (parsed.length === 0) {
+      continue;
+    }
+
+    headerTagCodes = parsed;
+    headerLines[index] = headerLines[index].replace(HEADER_TAG_LINE_REGEX, "").replace(/[ \t]+$/g, "");
+    break;
+  }
+
+  const headerText = headerLines.join("\n").trim();
+  const rawBodyText = lines.slice(bodyLineIndex).join("\n").replace(/[ \t\r\n]+$/g, "");
+  const bodyText = rawBodyText || canonicalText;
+  const bodyStartChar = rawBodyText
+    ? bodyLineIndex < lineOffsets.length
+      ? lineOffsets[bodyLineIndex]
+      : 0
+    : 0;
+
+  return {
+    headerText,
+    headerTagCodes,
+    bodyText,
+    bodyStartChar,
+  };
+}
+
 export function normalizeCanonicalText(input: string): string {
   const normalized = input
     .normalize("NFKC")
@@ -146,6 +252,10 @@ export async function ingestSourceFile(
       extractMethod: "failed",
       titleFromSource: null,
       normalizedText: "",
+      headerText: "",
+      bodyText: "",
+      bodyStartChar: 0,
+      headerTagCodes: [],
       rawHash: sha256Buffer(bytes),
       canonHash: null,
       status: "EXTRACTION_FAILED",
@@ -167,6 +277,7 @@ export async function ingestSourceFile(
 
   const extraction = await extractor(input);
   const normalizedText = normalizeCanonicalText(extraction.extractedText);
+  const split = splitHeaderAndBody(normalizedText);
   const status = determineStatus({
     sourceType: extraction.sourceType,
     extractMethod: extraction.extractMethod,
@@ -185,6 +296,10 @@ export async function ingestSourceFile(
     extractMethod: extraction.extractMethod,
     titleFromSource: extraction.titleFromSource,
     normalizedText,
+    headerText: split.headerText,
+    bodyText: split.bodyText,
+    bodyStartChar: split.bodyStartChar,
+    headerTagCodes: split.headerTagCodes,
     rawHash: sha256Buffer(bytes),
     canonHash: status.status === "EXTRACTION_FAILED" ? null : sha256Text(normalizedText),
     status: status.status,

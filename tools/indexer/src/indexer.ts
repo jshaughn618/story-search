@@ -97,7 +97,12 @@ function createInitialStatusCounts(): Record<StoryStatus, number> {
   };
 }
 
-function fallbackMetadata(relativePath: string, status: StoryStatus, statusNotes: string | null): StoryMetadata {
+function fallbackMetadata(
+  relativePath: string,
+  status: StoryStatus,
+  statusNotes: string | null,
+  headerTagCodes: string[],
+): StoryMetadata {
   const filename = path.basename(relativePath, path.extname(relativePath));
   const title = filename.replace(/[_-]+/g, " ").trim() || "Untitled Story";
 
@@ -110,7 +115,7 @@ function fallbackMetadata(relativePath: string, status: StoryStatus, statusNotes
     tone: "Unknown",
     setting: "",
     themes: [],
-    tags: [],
+    tags: headerTagCodes,
     content_notes: statusNotes ? [statusNotes] : [],
   };
 }
@@ -392,20 +397,37 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       }
 
       const shouldRunAi = ingest.status === "OK";
-      let metadata = fallbackMetadata(ingest.sourcePath, ingest.status, ingest.statusNotes);
+      let metadata = fallbackMetadata(
+        ingest.sourcePath,
+        ingest.status,
+        ingest.statusNotes,
+        ingest.headerTagCodes,
+      );
       let metadataFailureNote: string | null = null;
       if (shouldRunAi) {
         try {
-          metadata = await extractStoryMetadata(config, ingest.normalizedText, ingest.sourcePath);
+          metadata = await extractStoryMetadata(config, {
+            sourcePath: ingest.sourcePath,
+            headerTagCodes: ingest.headerTagCodes,
+            headerText: ingest.headerText,
+            bodyText: ingest.bodyText,
+          });
         } catch (metadataError) {
           const message = metadataError instanceof Error ? metadataError.message : "unknown metadata error";
           metadataFailureNote = `Metadata extraction fallback used: ${message}`;
-          metadata = fallbackMetadata(ingest.sourcePath, ingest.status, metadataFailureNote);
+          metadata = fallbackMetadata(
+            ingest.sourcePath,
+            ingest.status,
+            metadataFailureNote,
+            ingest.headerTagCodes,
+          );
           console.warn(`! metadata fallback: ${ingest.sourcePath} (${message})`);
         }
       }
 
-      const chunks = chunkText(ingest.normalizedText, {
+      const chunkSourceText = ingest.bodyText.trim() ? ingest.bodyText : ingest.normalizedText;
+      const chunkSourceOffset = chunkSourceText === ingest.bodyText ? ingest.bodyStartChar : 0;
+      const chunks = chunkText(chunkSourceText, {
         chunkSizeChars: config.chunkSizeChars,
         overlapChars: config.chunkOverlapChars,
       });
@@ -418,8 +440,8 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         chunksKey,
         chunks.map((chunk) => ({
           chunkIndex: chunk.chunkIndex,
-          startChar: chunk.startChar,
-          endChar: chunk.endChar,
+          startChar: chunk.startChar + chunkSourceOffset,
+          endChar: chunk.endChar + chunkSourceOffset,
           excerpt: chunk.excerpt,
         })),
       );
@@ -430,6 +452,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         contentHash: ingest.canonHash,
         rawHash: ingest.rawHash,
         canonHash: ingest.canonHash,
+        headerTagCodes: ingest.headerTagCodes,
         storyStatus: ingest.status,
         sourceCount: 1,
         canonTextSource: ingest.sourceType,
@@ -446,7 +469,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         themes: metadata.themes,
         contentNotes: metadata.content_notes,
         wordCount: countWords(ingest.normalizedText),
-        chunkCount: chunks.length,
+        chunkCount: Math.max(0, chunks.length),
         r2Key,
         chunksKey,
         updatedAt: ingestedAt,
