@@ -2,11 +2,13 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { chunkText } from "./chunking.js";
 import { CloudflareClient } from "./cloudflare.js";
-import { ingestSourceFile } from "./ingest.js";
+import { ingestSourceFile, loadSourceRaw } from "./ingest.js";
 import { extractStoryMetadata } from "./lmstudio.js";
 import { createWorkersAiEmbeddings } from "./workers-ai.js";
 import type {
   CleanupSummary,
+  ExistingSourceRow,
+  ExistingStoryRow,
   ExtractionFailureItem,
   IndexedStory,
   IndexerConfig,
@@ -316,6 +318,18 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
   const vectorBatch: VectorRecord[] = [];
   let vectorBatchBytes = 0;
 
+  const sourceByPath = new Map<string, ExistingSourceRow>();
+  for (const source of await client.getAllSources()) {
+    sourceByPath.set(source.SOURCE_PATH, source);
+  }
+
+  const canonicalByHash = new Map<string, ExistingStoryRow>();
+  for (const story of await client.getAllStoriesByCanonHash()) {
+    if (story.CANON_HASH) {
+      canonicalByHash.set(story.CANON_HASH, story);
+    }
+  }
+
   const flushVectorBatch = async () => {
     if (vectorBatch.length === 0) {
       return;
@@ -331,7 +345,19 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
     const relativePath = normalizePathForDb(absoluteFolder, filePath);
 
     try {
-      const ingest = await ingestSourceFile(filePath, relativePath, config);
+      let previousSource = sourceByPath.get(relativePath) ?? null;
+      let preloadedSource: { bytes: Buffer; rawHash: string } | undefined;
+
+      if (options.changedOnly && previousSource) {
+        preloadedSource = await loadSourceRaw(filePath);
+        if (previousSource.RAW_HASH === preloadedSource.rawHash) {
+          summary.skipped += 1;
+          console.log(`- unchanged: ${relativePath}`);
+          continue;
+        }
+      }
+
+      const ingest = await ingestSourceFile(filePath, relativePath, config, preloadedSource);
       totalsBySourceType[ingest.sourceType] = (totalsBySourceType[ingest.sourceType] ?? 0) + 1;
       countsByStatus[ingest.status] += 1;
 
@@ -361,15 +387,8 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       extractedWordCounts.push(countWords(ingest.normalizedText));
 
       const derivedStoryId = createStoryId(ingest.canonHash);
-      const previousSource = await client.getSourceByPath(ingest.sourcePath);
 
-      if (options.changedOnly && previousSource?.RAW_HASH === ingest.rawHash) {
-        summary.skipped += 1;
-        console.log(`- unchanged: ${ingest.sourcePath}`);
-        continue;
-      }
-
-      const existingCanonical = await client.getStoryByCanonHash(ingest.canonHash);
+      const existingCanonical = canonicalByHash.get(ingest.canonHash) ?? null;
       const storyId = existingCanonical?.STORY_ID ?? derivedStoryId;
       const ingestedAt = new Date().toISOString();
       await fs.writeFile(path.join(config.outputTextDir, `${storyId}.txt`), ingest.normalizedText, "utf8");
@@ -392,9 +411,19 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
 
         if (previousSource && previousSource.STORY_ID !== storyId) {
           await client.deleteStoryIfOrphan(previousSource.STORY_ID);
+          for (const [canonHash, story] of canonicalByHash.entries()) {
+            if (story.STORY_ID === previousSource.STORY_ID) {
+              canonicalByHash.delete(canonHash);
+            }
+          }
         }
 
         await client.refreshSourceCount(storyId);
+        sourceByPath.set(ingest.sourcePath, {
+          STORY_ID: storyId,
+          SOURCE_PATH: ingest.sourcePath,
+          RAW_HASH: ingest.rawHash,
+        });
         summary.deduped += 1;
         console.log(`= deduped: ${ingest.sourcePath} -> ${storyId}`);
         continue;
@@ -481,9 +510,32 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
 
       if (previousSource && previousSource.STORY_ID !== storyId) {
         await client.deleteStoryIfOrphan(previousSource.STORY_ID);
+        for (const [canonHash, story] of canonicalByHash.entries()) {
+          if (story.STORY_ID === previousSource.STORY_ID) {
+            canonicalByHash.delete(canonHash);
+          }
+        }
       }
 
       await client.refreshSourceCount(storyId);
+      sourceByPath.set(ingest.sourcePath, {
+        STORY_ID: storyId,
+        SOURCE_PATH: ingest.sourcePath,
+        RAW_HASH: ingest.rawHash,
+      });
+      canonicalByHash.set(ingest.canonHash, {
+        STORY_ID: storyId,
+        SOURCE_PATH: ingest.sourcePath,
+        RAW_HASH: ingest.rawHash,
+        CANON_HASH: ingest.canonHash,
+        R2_KEY: r2Key,
+        CHUNKS_KEY: chunksKey,
+        STORY_STATUS: ingest.status,
+        CHUNK_COUNT: chunks.length,
+        SOURCE_COUNT: 1,
+        TITLE: metadata.title,
+        AUTHOR: metadata.author,
+      });
 
       if (shouldRunAi) {
         const embeddings = await embedInBatches(

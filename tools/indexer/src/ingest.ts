@@ -133,8 +133,10 @@ export async function ingestSourceFile(
   absolutePath: string,
   relativePath: string,
   config: IndexerConfig,
+  preloaded?: { bytes: Buffer; rawHash: string },
 ): Promise<IngestedSource> {
-  const bytes = await fs.readFile(absolutePath);
+  const bytes = preloaded?.bytes ?? (await fs.readFile(absolutePath));
+  const rawHash = preloaded?.rawHash ?? sha256Buffer(bytes);
   const extension = path.extname(absolutePath).toLowerCase();
   const sourceType = inferSourceType(extension);
   const extractor = getExtractorByExtension(extension);
@@ -146,7 +148,7 @@ export async function ingestSourceFile(
       extractMethod: "failed",
       titleFromSource: null,
       normalizedText: "",
-      rawHash: sha256Buffer(bytes),
+      rawHash,
       canonHash: null,
       status: "EXTRACTION_FAILED",
       statusNotes: `No extractor registered for extension: ${extension}`,
@@ -185,7 +187,7 @@ export async function ingestSourceFile(
     extractMethod: extraction.extractMethod,
     titleFromSource: extraction.titleFromSource,
     normalizedText,
-    rawHash: sha256Buffer(bytes),
+    rawHash,
     canonHash: status.status === "EXTRACTION_FAILED" ? null : sha256Text(normalizedText),
     status: status.status,
     statusNotes: notes.length > 0 ? notes.join("; ") : null,
@@ -193,5 +195,13 @@ export async function ingestSourceFile(
     originalBytes: bytes,
     extractedChars: normalizedText.length,
     extractionError: extraction.errorMessage ?? null,
+  };
+}
+
+export async function loadSourceRaw(absolutePath: string): Promise<{ bytes: Buffer; rawHash: string }> {
+  const bytes = await fs.readFile(absolutePath);
+  return {
+    bytes,
+    rawHash: sha256Buffer(bytes),
   };
 }

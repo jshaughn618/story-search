@@ -106,6 +106,12 @@ export class CloudflareClient {
     return rows[0] ?? null;
   }
 
+  async getAllSources(): Promise<ExistingSourceRow[]> {
+    return this.d1Query<ExistingSourceRow>(
+      "SELECT STORY_ID, SOURCE_PATH, RAW_HASH FROM STORY_SOURCES",
+    );
+  }
+
   async getStoryByCanonHash(canonHash: string): Promise<ExistingStoryRow | null> {
     const rows = await this.d1Query<ExistingStoryRow>(
       `
@@ -118,6 +124,17 @@ export class CloudflareClient {
       [canonHash],
     );
     return rows[0] ?? null;
+  }
+
+  async getAllStoriesByCanonHash(): Promise<ExistingStoryRow[]> {
+    return this.d1Query<ExistingStoryRow>(
+      `
+      SELECT STORY_ID, SOURCE_PATH, RAW_HASH, CANON_HASH, R2_KEY, CHUNKS_KEY,
+             STORY_STATUS, CHUNK_COUNT, SOURCE_COUNT, TITLE, AUTHOR
+      FROM STORIES
+      WHERE CANON_HASH IS NOT NULL AND CANON_HASH != ''
+      `,
+    );
   }
 
   async upsertStory(story: IndexedStory) {
