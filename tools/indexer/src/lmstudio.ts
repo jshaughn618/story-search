@@ -23,10 +23,9 @@ const STORY_METADATA_JSON_SCHEMA = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: ["title", "author", "summary_short", "summary_long", "themes", "tags"],
+    required: ["title", "summary_short", "summary_long", "themes", "tags"],
     properties: {
       title: { type: "string" },
-      author: { anyOf: [{ type: "string" }, { type: "null" }] },
       summary_short: { type: "string" },
       summary_long: { type: "string" },
       themes: { type: "array", items: { type: "string" }, maxItems: 8 },
@@ -109,17 +108,16 @@ function normalizeMetadata(input: unknown): StoryMetadata {
   const value = (input ?? {}) as Record<string, unknown>;
 
   const title = typeof value.title === "string" && value.title.trim() ? value.title.trim() : "Untitled Story";
-  const authorRaw = typeof value.author === "string" ? value.author.trim() : "";
   const summaryShortRaw = typeof value.summary_short === "string" ? value.summary_short.trim() : "";
   const summaryLongRaw = typeof value.summary_long === "string" ? value.summary_long.trim() : "";
 
   return {
     title,
-    author: authorRaw ? authorRaw.slice(0, 160) : null,
+    author: null,
     summary_short: summaryShortRaw.slice(0, 280),
     summary_long: summaryLongRaw || summaryShortRaw,
-    genre: "Unknown",
-    tone: "Unknown",
+    genre: "",
+    tone: "",
     setting: "",
     themes: asArray(value.themes, 8),
     tags: asArray(value.tags, 16).slice(0, 12),
@@ -234,20 +232,18 @@ export async function extractStoryMetadata(
 ): Promise<StoryMetadata> {
   const textForModel = buildMetadataPrompt(storyText);
 
-  const systemPrompt = `You are a story cataloging assistant.
+  const userPrompt = `Source path: ${sourcePath}
 Return STRICT JSON only with this schema:
 {
   "title": "string",
-  "author": "string | null (null if unknown)",
   "summary_short": "<=280 chars",
   "summary_long": "3-6 sentences",
   "themes": ["up to 8 strings"],
   "tags": ["up to 12 strings"]
 }
 Use only what you see in the story text. Do not infer from external sources.
-Do not include markdown or extra keys.`;
+Do not include markdown or extra keys.
 
-  const userPrompt = `Source path: ${sourcePath}
 Analyze the story text below and return only JSON.
 
 ${textForModel}`;
@@ -259,7 +255,6 @@ ${textForModel}`;
     config.lmStudioTimeoutMs,
     config.lmStudioMaxRetries,
     [
-      { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
   );

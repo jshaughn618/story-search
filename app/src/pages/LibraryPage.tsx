@@ -326,6 +326,12 @@ export function LibraryPage() {
           const chunkQuery = story.bestChunk ? `?chunk=${story.bestChunk.chunkIndex}` : "";
           const menuOpen = openMenuStoryId === story.storyId;
           const deleting = deletingStoryId === story.storyId;
+          const metaParts = [
+            story.genre && story.genre.trim().toLowerCase() !== "unknown" ? story.genre : null,
+            story.tone && story.tone.trim().toLowerCase() !== "unknown" ? story.tone : null,
+            `${story.wordCount} words`,
+            story.storyStatus,
+          ].filter((value): value is string => Boolean(value));
           return (
             <article key={story.storyId} className="story-card">
               <header className="story-head">
@@ -338,9 +344,7 @@ export function LibraryPage() {
                       {story.title}
                     </Link>
                   </h2>
-                  <p className="story-meta">
-                    {story.genre || "Unknown genre"} • {story.tone || "Unknown tone"} • {story.wordCount} words • {story.storyStatus}
-                  </p>
+                  <p className="story-meta">{metaParts.join(" • ")}</p>
                 </div>
 
                 <div className="story-menu-wrap" ref={menuOpen ? menuRef : null}>

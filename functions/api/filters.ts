@@ -18,10 +18,10 @@ interface StatusRow {
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   const [genresResult, tonesResult, tagsResult, statusesResult] = await Promise.all([
     env.STORY_DB.prepare(
-      "SELECT DISTINCT GENRE AS value FROM STORIES WHERE GENRE IS NOT NULL AND GENRE != '' ORDER BY value",
+      "SELECT DISTINCT GENRE AS value FROM STORIES WHERE GENRE IS NOT NULL AND GENRE != '' AND LOWER(TRIM(GENRE)) != 'unknown' ORDER BY value",
     ).all<SingleValueRow>(),
     env.STORY_DB.prepare(
-      "SELECT DISTINCT TONE AS value FROM STORIES WHERE TONE IS NOT NULL AND TONE != '' ORDER BY value",
+      "SELECT DISTINCT TONE AS value FROM STORIES WHERE TONE IS NOT NULL AND TONE != '' AND LOWER(TRIM(TONE)) != 'unknown' ORDER BY value",
     ).all<SingleValueRow>(),
     env.STORY_DB.prepare(
       "SELECT TAG AS tag, COUNT(*) AS count FROM STORY_TAGS GROUP BY TAG ORDER BY count DESC, tag ASC LIMIT 100",

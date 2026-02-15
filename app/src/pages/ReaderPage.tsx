@@ -135,6 +135,11 @@ export function ReaderPage() {
   } as CSSProperties;
 
   const backTo = (location.state as { from?: string } | null)?.from;
+  const readerMetaParts = [
+    data?.story.genre && data.story.genre.trim().toLowerCase() !== "unknown" ? data.story.genre : null,
+    data?.story.tone && data.story.tone.trim().toLowerCase() !== "unknown" ? data.story.tone : null,
+    data ? `${data.story.wordCount} words` : null,
+  ].filter((value): value is string => Boolean(value));
 
   if (loading) {
     return <main className="reader-page">Loading story...</main>;
@@ -214,9 +219,7 @@ export function ReaderPage() {
 
       <section className="reader-meta">
         <h1>{data.story.title}</h1>
-        <p>
-          {data.story.genre || "Unknown genre"} • {data.story.tone || "Unknown tone"} • {data.story.wordCount} words
-        </p>
+        <p>{readerMetaParts.join(" • ")}</p>
       </section>
 
       <article className={`reader-body width-${preferences.width} line-${preferences.lineHeight}`}>
