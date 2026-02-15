@@ -17,23 +17,6 @@ class LmStudioRequestError extends Error {
   }
 }
 
-const STORY_METADATA_JSON_SCHEMA = {
-  name: "story_metadata",
-  strict: true,
-  schema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["title", "summary_short", "summary_long", "themes", "tags"],
-    properties: {
-      title: { type: "string" },
-      summary_short: { type: "string" },
-      summary_long: { type: "string" },
-      themes: { type: "array", items: { type: "string" }, maxItems: 8 },
-      tags: { type: "array", items: { type: "string" }, maxItems: 16 },
-    },
-  },
-} as const;
-
 function buildMetadataPrompt(storyText: string) {
   const maxSection = 8000;
   if (storyText.length <= maxSection * 2) {
@@ -181,17 +164,9 @@ async function callChatCompletion(
   let attempt = 0;
   while (attempt <= maxRetries) {
     try {
-      return await request({ type: "json_schema", json_schema: STORY_METADATA_JSON_SCHEMA });
+      return await request({ type: "text" });
     } catch (error) {
-      if (error instanceof LmStudioRequestError && error.status === 400) {
-        try {
-          return await request({ type: "text" });
-        } catch (textError) {
-          if (attempt >= maxRetries || !isRetryable(textError)) {
-            throw textError;
-          }
-        }
-      } else if (attempt >= maxRetries || !isRetryable(error)) {
+      if (attempt >= maxRetries || !isRetryable(error)) {
         throw error;
       }
 
