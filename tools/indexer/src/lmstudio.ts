@@ -173,6 +173,7 @@ async function callChatCompletion(
       body: JSON.stringify({
         model,
         temperature: 0.1,
+        response_format: { type: "text" },
         messages,
       }),
     });
