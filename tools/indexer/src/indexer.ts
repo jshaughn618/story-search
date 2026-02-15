@@ -22,6 +22,7 @@ interface RunOptions {
   changedOnly: boolean;
   forceReindex: boolean;
   reprocessExisting: boolean;
+  profile: boolean;
 }
 
 interface RunSummary {
@@ -37,6 +38,16 @@ interface RunSummary {
     flaggedFilesPath: string;
     extractionFailuresPath: string;
   };
+  profile?: {
+    timingsMs: Record<string, number>;
+    counts: Record<string, number>;
+  };
+}
+
+interface ProfileStats {
+  enabled: boolean;
+  timingsMs: Record<string, number>;
+  counts: Record<string, number>;
 }
 
 function shouldGenerateEmbeddings(status: StoryStatus): boolean {
@@ -91,6 +102,64 @@ async function collectFiles(root: string, acceptedExtensions: string[]): Promise
   );
 
   return nested.flat().sort();
+}
+
+function createProfile(enabled: boolean): ProfileStats {
+  return {
+    enabled,
+    timingsMs: {},
+    counts: {},
+  };
+}
+
+function addTiming(profile: ProfileStats, key: string, durationMs: number) {
+  if (!profile.enabled) {
+    return;
+  }
+  profile.timingsMs[key] = (profile.timingsMs[key] ?? 0) + durationMs;
+}
+
+function incrementCount(profile: ProfileStats, key: string, amount = 1) {
+  if (!profile.enabled) {
+    return;
+  }
+  profile.counts[key] = (profile.counts[key] ?? 0) + amount;
+}
+
+async function withTiming<T>(profile: ProfileStats, key: string, fn: () => Promise<T>): Promise<T> {
+  const start = performance.now();
+  try {
+    return await fn();
+  } finally {
+    addTiming(profile, key, performance.now() - start);
+  }
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await worker(items[index]);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(concurrency, items.length)) }, () => runWorker()),
+  );
+
+  return results;
 }
 
 function createInitialStatusCounts(): Record<StoryStatus, number> {
@@ -263,8 +332,12 @@ async function writeReports(params: {
 }
 
 export async function runIndexing(config: IndexerConfig, folder: string, options: RunOptions): Promise<RunSummary> {
+  const profile = createProfile(options.profile);
+  const runStartedAt = performance.now();
   const absoluteFolder = path.resolve(folder);
-  const files = await collectFiles(absoluteFolder, config.acceptExtensions);
+  const files = await withTiming(profile, "collect_files_ms", () =>
+    collectFiles(absoluteFolder, config.acceptExtensions),
+  );
   const client = new CloudflareClient(config);
 
   const summary: RunSummary = {
@@ -288,13 +361,17 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
   const extractionFailures: ExtractionFailureItem[] = [];
   const extractedWordCounts: number[] = [];
 
-  const probeVectors = await createWorkersAiEmbeddings(config, ["embedding dimension probe"]);
+  const probeVectors = await withTiming(profile, "embedding_probe_ms", () =>
+    createWorkersAiEmbeddings(config, ["embedding dimension probe"]),
+  );
   const runtimeDimension = probeVectors[0]?.length ?? 0;
   if (runtimeDimension <= 0) {
     throw new Error("Workers AI embedding dimension probe failed");
   }
 
-  const settings = await loadEmbeddingSettings(client);
+  const settings = await withTiming(profile, "settings_load_ms", () =>
+    loadEmbeddingSettings(client),
+  );
   if (
     settings.storedModelName &&
     settings.storedModelName !== config.cfAiEmbedModel &&
@@ -319,22 +396,52 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
   let vectorBatchBytes = 0;
 
   const sourceByPath = new Map<string, ExistingSourceRow>();
-  for (const source of await client.getAllSources()) {
+  for (const source of await withTiming(profile, "d1_prefetch_sources_ms", () => client.getAllSources())) {
     sourceByPath.set(source.SOURCE_PATH, source);
   }
 
   const canonicalByHash = new Map<string, ExistingStoryRow>();
-  for (const story of await client.getAllStoriesByCanonHash()) {
+  for (const story of await withTiming(profile, "d1_prefetch_canonical_ms", () =>
+    client.getAllStoriesByCanonHash(),
+  )) {
     if (story.CANON_HASH) {
       canonicalByHash.set(story.CANON_HASH, story);
     }
+  }
+
+  const unchangedByPath = new Set<string>();
+  const preloadedByPath = new Map<string, { bytes: Buffer; rawHash: string }>();
+  if (options.changedOnly) {
+    await withTiming(profile, "prehash_stage_ms", async () => {
+      await mapWithConcurrency(files, config.hashConcurrency, async (filePath) => {
+        const relativePath = normalizePathForDb(absoluteFolder, filePath);
+        const previousSource = sourceByPath.get(relativePath);
+        if (!previousSource) {
+          return;
+        }
+
+        const preloadedSource = await withTiming(profile, "hash_file_ms", () => loadSourceRaw(filePath));
+        if (previousSource.RAW_HASH === preloadedSource.rawHash) {
+          unchangedByPath.add(relativePath);
+          incrementCount(profile, "prefilter_unchanged");
+          return;
+        }
+
+        preloadedByPath.set(relativePath, preloadedSource);
+        incrementCount(profile, "prefilter_changed");
+      });
+    });
   }
 
   const flushVectorBatch = async () => {
     if (vectorBatch.length === 0) {
       return;
     }
-    summary.vectorsUpserted += await client.upsertVectors(vectorBatch);
+    summary.vectorsUpserted += await withTiming(profile, "vector_upsert_ms", () =>
+      client.upsertVectors(vectorBatch),
+    );
+    incrementCount(profile, "vector_upsert_batches");
+    incrementCount(profile, "vectors_upserted", vectorBatch.length);
     vectorBatch.length = 0;
     vectorBatchBytes = 0;
   };
@@ -346,18 +453,29 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
 
     try {
       let previousSource = sourceByPath.get(relativePath) ?? null;
-      let preloadedSource: { bytes: Buffer; rawHash: string } | undefined;
+      const preloadedSource = preloadedByPath.get(relativePath);
 
-      if (options.changedOnly && previousSource) {
-        preloadedSource = await loadSourceRaw(filePath);
-        if (previousSource.RAW_HASH === preloadedSource.rawHash) {
+      if (options.changedOnly && unchangedByPath.has(relativePath)) {
+        summary.skipped += 1;
+        incrementCount(profile, "skipped_unchanged");
+        console.log(`- unchanged: ${relativePath}`);
+        continue;
+      }
+
+      if (options.changedOnly && previousSource && !preloadedSource) {
+        const fallbackRaw = await withTiming(profile, "hash_file_ms", () => loadSourceRaw(filePath));
+        if (previousSource.RAW_HASH === fallbackRaw.rawHash) {
           summary.skipped += 1;
+          incrementCount(profile, "skipped_unchanged");
           console.log(`- unchanged: ${relativePath}`);
           continue;
         }
       }
 
-      const ingest = await ingestSourceFile(filePath, relativePath, config, preloadedSource);
+      const ingest = await withTiming(profile, "ingest_extract_normalize_ms", () =>
+        ingestSourceFile(filePath, relativePath, config, preloadedSource),
+      );
+      incrementCount(profile, "files_processed");
       totalsBySourceType[ingest.sourceType] = (totalsBySourceType[ingest.sourceType] ?? 0) + 1;
       countsByStatus[ingest.status] += 1;
 
@@ -375,6 +493,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
 
       if (ingest.status === "EXTRACTION_FAILED" || !ingest.canonHash) {
         summary.failed += 1;
+        incrementCount(profile, "files_failed_extraction");
         extractionFailures.push({
           sourcePath: ingest.sourcePath,
           sourceType: ingest.sourceType,
@@ -391,26 +510,32 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       const existingCanonical = canonicalByHash.get(ingest.canonHash) ?? null;
       const storyId = existingCanonical?.STORY_ID ?? derivedStoryId;
       const ingestedAt = new Date().toISOString();
-      await fs.writeFile(path.join(config.outputTextDir, `${storyId}.txt`), ingest.normalizedText, "utf8");
+      await withTiming(profile, "local_artifact_write_ms", () =>
+        fs.writeFile(path.join(config.outputTextDir, `${storyId}.txt`), ingest.normalizedText, "utf8"),
+      );
 
       if (config.storeOriginalBinary) {
         const originalKey = `sources/original/${storyId}/${Buffer.from(ingest.sourcePath).toString("hex")}${path.extname(filePath).toLowerCase()}`;
-        await client.uploadRawObject(originalKey, ingest.originalBytes, getBinaryContentType(filePath));
+        await withTiming(profile, "r2_upload_ms", () =>
+          client.uploadRawObject(originalKey, ingest.originalBytes, getBinaryContentType(filePath)),
+        );
       }
 
       if (existingCanonical && !options.reprocessExisting) {
-        await client.upsertStorySource({
-          storyId,
-          sourcePath: ingest.sourcePath,
-          rawHash: ingest.rawHash,
-          ingestedAt,
-          sourceType: ingest.sourceType,
-          extractMethod: ingest.extractMethod,
-          titleFromSource: ingest.titleFromSource,
-        });
+        await withTiming(profile, "d1_write_ms", () =>
+          client.upsertStorySource({
+            storyId,
+            sourcePath: ingest.sourcePath,
+            rawHash: ingest.rawHash,
+            ingestedAt,
+            sourceType: ingest.sourceType,
+            extractMethod: ingest.extractMethod,
+            titleFromSource: ingest.titleFromSource,
+          }),
+        );
 
         if (previousSource && previousSource.STORY_ID !== storyId) {
-          await client.deleteStoryIfOrphan(previousSource.STORY_ID);
+          await withTiming(profile, "d1_write_ms", () => client.deleteStoryIfOrphan(previousSource.STORY_ID));
           for (const [canonHash, story] of canonicalByHash.entries()) {
             if (story.STORY_ID === previousSource.STORY_ID) {
               canonicalByHash.delete(canonHash);
@@ -418,13 +543,14 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
           }
         }
 
-        await client.refreshSourceCount(storyId);
+        await withTiming(profile, "d1_write_ms", () => client.refreshSourceCount(storyId));
         sourceByPath.set(ingest.sourcePath, {
           STORY_ID: storyId,
           SOURCE_PATH: ingest.sourcePath,
           RAW_HASH: ingest.rawHash,
         });
         summary.deduped += 1;
+        incrementCount(profile, "files_deduped");
         console.log(`= deduped: ${ingest.sourcePath} -> ${storyId}`);
         continue;
       }
@@ -434,7 +560,9 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       let metadataFailureNote: string | null = null;
       if (shouldRunAi) {
         try {
-          metadata = await extractStoryMetadata(config, ingest.normalizedText, ingest.sourcePath);
+          metadata = await withTiming(profile, "metadata_lm_ms", () =>
+            extractStoryMetadata(config, ingest.normalizedText, ingest.sourcePath),
+          );
         } catch (metadataError) {
           const message = metadataError instanceof Error ? metadataError.message : "unknown metadata error";
           metadataFailureNote = `Metadata extraction fallback used: ${message}`;
@@ -443,24 +571,28 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         }
       }
 
-      const chunks = chunkText(ingest.normalizedText, {
-        chunkSizeChars: config.chunkSizeChars,
-        overlapChars: config.chunkOverlapChars,
-      });
+      const chunks = await withTiming(profile, "chunking_ms", async () =>
+        chunkText(ingest.normalizedText, {
+          chunkSizeChars: config.chunkSizeChars,
+          overlapChars: config.chunkOverlapChars,
+        }),
+      );
 
       const r2Key = `stories/${storyId}.txt`;
       const chunksKey = `stories/${storyId}.chunks.json`;
 
-      await client.uploadTextObject(r2Key, ingest.normalizedText);
-      await client.uploadJsonObject(
-        chunksKey,
-        chunks.map((chunk) => ({
-          chunkIndex: chunk.chunkIndex,
-          startChar: chunk.startChar,
-          endChar: chunk.endChar,
-          excerpt: chunk.excerpt,
-        })),
-      );
+      await withTiming(profile, "r2_upload_ms", async () => {
+        await client.uploadTextObject(r2Key, ingest.normalizedText);
+        await client.uploadJsonObject(
+          chunksKey,
+          chunks.map((chunk) => ({
+            chunkIndex: chunk.chunkIndex,
+            startChar: chunk.startChar,
+            endChar: chunk.endChar,
+            excerpt: chunk.excerpt,
+          })),
+        );
+      });
 
       const indexedStory: IndexedStory = {
         storyId,
@@ -496,20 +628,22 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
           : metadataFailureNote;
       }
 
-      await client.upsertStory(indexedStory);
-      await client.replaceStoryTags(storyId, shouldRunAi ? metadata.tags : []);
-      await client.upsertStorySource({
-        storyId,
-        sourcePath: ingest.sourcePath,
-        rawHash: ingest.rawHash,
-        ingestedAt,
-        sourceType: ingest.sourceType,
-        extractMethod: ingest.extractMethod,
-        titleFromSource: ingest.titleFromSource,
+      await withTiming(profile, "d1_write_ms", async () => {
+        await client.upsertStory(indexedStory);
+        await client.replaceStoryTags(storyId, shouldRunAi ? metadata.tags : []);
+        await client.upsertStorySource({
+          storyId,
+          sourcePath: ingest.sourcePath,
+          rawHash: ingest.rawHash,
+          ingestedAt,
+          sourceType: ingest.sourceType,
+          extractMethod: ingest.extractMethod,
+          titleFromSource: ingest.titleFromSource,
+        });
       });
 
       if (previousSource && previousSource.STORY_ID !== storyId) {
-        await client.deleteStoryIfOrphan(previousSource.STORY_ID);
+        await withTiming(profile, "d1_write_ms", () => client.deleteStoryIfOrphan(previousSource.STORY_ID));
         for (const [canonHash, story] of canonicalByHash.entries()) {
           if (story.STORY_ID === previousSource.STORY_ID) {
             canonicalByHash.delete(canonHash);
@@ -517,7 +651,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         }
       }
 
-      await client.refreshSourceCount(storyId);
+      await withTiming(profile, "d1_write_ms", () => client.refreshSourceCount(storyId));
       sourceByPath.set(ingest.sourcePath, {
         STORY_ID: storyId,
         SOURCE_PATH: ingest.sourcePath,
@@ -538,9 +672,11 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       });
 
       if (shouldRunAi) {
-        const embeddings = await embedInBatches(
-          config,
-          chunks.map((chunk) => chunk.text),
+        const embeddings = await withTiming(profile, "embedding_docs_ms", () =>
+          embedInBatches(
+            config,
+            chunks.map((chunk) => chunk.text),
+          ),
         );
 
         for (let index = 0; index < chunks.length; index += 1) {
@@ -576,6 +712,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       console.log(`+ indexed: ${ingest.sourcePath} (${chunks.length} chunks, ${ingest.status})`);
     } catch (error) {
       summary.failed += 1;
+      incrementCount(profile, "files_failed_runtime");
       extractionFailures.push({
         sourcePath: relativePath,
         sourceType: sourceTypeFromExtension(path.extname(relativePath)),
@@ -605,19 +742,37 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
     medianWordCount: Number(median(extractedWordCounts).toFixed(2)),
   };
 
-  const duplicateGroups = await client.getDuplicateGroups(500);
+  const duplicateGroups = await withTiming(profile, "d1_read_reporting_ms", () =>
+    client.getDuplicateGroups(500),
+  );
 
-  summary.reports = await writeReports({
-    config,
-    summary: cleanupSummary,
-    duplicateGroups,
-    flaggedFiles,
-    extractionFailures,
+  summary.reports = await withTiming(profile, "report_write_ms", () =>
+    writeReports({
+      config,
+      summary: cleanupSummary,
+      duplicateGroups,
+      flaggedFiles,
+      extractionFailures,
+    }),
+  );
+
+  await withTiming(profile, "settings_write_ms", async () => {
+    await client.setSetting("embedding_model_name", config.cfAiEmbedModel);
+    await client.setSetting("embedding_dimension", String(runtimeDimension));
+    await client.setSetting("indexed_at", new Date().toISOString());
   });
 
-  await client.setSetting("embedding_model_name", config.cfAiEmbedModel);
-  await client.setSetting("embedding_dimension", String(runtimeDimension));
-  await client.setSetting("indexed_at", new Date().toISOString());
+  if (profile.enabled) {
+    addTiming(profile, "total_run_ms", performance.now() - runStartedAt);
+    summary.profile = {
+      timingsMs: Object.fromEntries(
+        Object.entries(profile.timingsMs)
+          .map(([key, value]) => [key, Number(value.toFixed(2))])
+          .sort((a, b) => (b[1] as number) - (a[1] as number)),
+      ),
+      counts: profile.counts,
+    };
+  }
 
   return summary;
 }

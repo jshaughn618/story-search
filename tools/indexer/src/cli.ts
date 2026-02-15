@@ -93,28 +93,12 @@ program
 program
   .command("index")
   .argument("<folder>", "Folder containing .txt/.html/.rtf/.doc/.docx/.pdf stories")
-  .option("--force-reindex", "Override embedding model/dimension settings mismatch checks", false)
-  .description("Index all files in a folder")
-  .action(async (folder: string, options: { forceReindex?: boolean }) => {
-    const config = loadConfig();
-    const inputFolder = resolveInputFolder(folder, loadedEnvPath);
-    const summary = await runIndexing(config, inputFolder, {
-      changedOnly: false,
-      forceReindex: options.forceReindex === true,
-      reprocessExisting: false,
-    });
-    console.log("\nIndex complete");
-    console.log(JSON.stringify(summary, null, 2));
-  });
-
-program
-  .command("reindex")
-  .argument("<folder>", "Folder containing .txt/.html/.rtf/.doc/.docx/.pdf stories")
   .option("--changed-only", "Skip files when source path + RAW_HASH are unchanged", true)
   .option("--full", "Reprocess existing canonical stories (metadata/chunks/embeddings)", false)
   .option("--force-reindex", "Override embedding model/dimension settings mismatch checks", false)
-  .description("Re-index files, optimized for changed inputs")
-  .action(async (folder: string, options: { changedOnly?: boolean; full?: boolean; forceReindex?: boolean }) => {
+  .option("--profile", "Print timing profile in the run summary", false)
+  .description("Index files in a folder (incremental by default)")
+  .action(async (folder: string, options: { changedOnly?: boolean; full?: boolean; forceReindex?: boolean; profile?: boolean }) => {
     const config = loadConfig();
     const inputFolder = resolveInputFolder(folder, loadedEnvPath);
     const full = options.full === true;
@@ -122,8 +106,9 @@ program
       changedOnly: full ? false : options.changedOnly !== false,
       forceReindex: options.forceReindex === true,
       reprocessExisting: full,
+      profile: options.profile === true,
     });
-    console.log("\nReindex complete");
+    console.log("\nIndex complete");
     console.log(JSON.stringify(summary, null, 2));
   });
 

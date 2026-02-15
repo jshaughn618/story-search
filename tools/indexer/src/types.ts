@@ -152,6 +152,7 @@ export interface IndexerConfig {
   htmlExtractMode: "readability_first" | "dom_only";
   storeOriginalBinary: boolean;
   vectorBatchMaxBytes: number;
+  hashConcurrency: number;
 }
 
 export interface ExtractorInput {

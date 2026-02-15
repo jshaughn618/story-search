@@ -176,13 +176,16 @@ Important env vars:
 - `REPORT_DIR=tools/indexer/reports`
 - `HTML_EXTRACT_MODE=readability_first`
 - `STORE_ORIGINAL_BINARY=false`
+- `INDEXER_HASH_CONCURRENCY=8`
 
 ### 5) Run indexer
 
 ```bash
 npm run start -w tools/indexer -- index ./sample_stories
-npm run start -w tools/indexer -- reindex ./sample_stories --changed-only
-npm run start -w tools/indexer -- reindex ./sample_stories --force-reindex
+npm run start -w tools/indexer -- index ./sample_stories --changed-only
+npm run start -w tools/indexer -- index ./sample_stories --changed-only --profile
+npm run start -w tools/indexer -- index ./sample_stories --full
+npm run start -w tools/indexer -- index ./sample_stories --full --force-reindex
 npm run start -w tools/indexer -- status
 ```
 
