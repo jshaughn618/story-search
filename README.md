@@ -49,7 +49,7 @@ For each file:
    - `CANON_HASH = sha256(normalized canonical text)`
 5. Dedupe by `CANON_HASH`
 6. If new canonical story:
-   - metadata via LM Studio (title, author, summaries, themes, tags from text)
+   - metadata via LM Studio (title, summaries, themes, tags from text)
    - chunk + Workers AI embeddings
    - upload canonical text + chunk map to R2
    - upsert metadata/status to D1
@@ -158,6 +158,7 @@ Important env vars:
 - `CF_AI_EMBED_MODEL=@cf/baai/bge-base-en-v1.5`
 - `LMSTUDIO_TIMEOUT_MS=120000`
 - `LMSTUDIO_MAX_RETRIES=2`
+- `LMSTUDIO_SYSTEM_PROMPT_PATH=tools/indexer/prompts/system_prompt.txt`
 - `INDEXER_ACCEPT_EXTENSIONS=.txt,.html,.htm,.rtf,.doc,.docx,.pdf`
 - `MIN_EXTRACT_CHARS=500`
 - `PDF_MIN_TEXT_CHARS=800`
@@ -178,6 +179,7 @@ npm run start -w tools/indexer -- status
 Notes:
 - The indexer auto-loads the nearest `.env` (including repo root `.env` when run with `-w tools/indexer`).
 - Folder paths can be repo-relative (for example `./stories/test`) or package-relative.
+- LM Studio system prompt content is loaded from `tools/indexer/prompts/system_prompt.txt` by default.
 
 ### 6) Run locally
 

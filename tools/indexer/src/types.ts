@@ -128,6 +128,7 @@ export interface IndexerConfig {
   lmStudioBaseUrl: string;
   lmStudioApiKey: string;
   lmStudioMetadataModel: string;
+  lmStudioSystemPromptPath: string;
   lmStudioTimeoutMs: number;
   lmStudioMaxRetries: number;
   cfAiEmbedModel: string;

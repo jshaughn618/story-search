@@ -47,6 +47,19 @@ function parseExtensions(value: string | undefined): string[] {
   return parsed.length > 0 ? [...new Set(parsed)] : fallback;
 }
 
+function resolveLocalPath(value: string): string {
+  if (path.isAbsolute(value)) {
+    return value;
+  }
+
+  const envPath = process.env.STORY_INDEXER_ENV_PATH;
+  if (envPath) {
+    return path.resolve(path.dirname(envPath), value);
+  }
+
+  return path.resolve(value);
+}
+
 export function loadConfig(): IndexerConfig {
   const accountId = process.env.CF_ACCOUNT_ID ?? process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CF_API_TOKEN ?? process.env.CLOUDFLARE_API_TOKEN;
@@ -66,6 +79,9 @@ export function loadConfig(): IndexerConfig {
     lmStudioBaseUrl: (process.env.LMSTUDIO_BASE_URL ?? "http://localhost:1234/v1").replace(/\/+$/, ""),
     lmStudioApiKey: process.env.LMSTUDIO_API_KEY ?? "lm-studio",
     lmStudioMetadataModel: process.env.LMSTUDIO_METADATA_MODEL ?? "local-metadata-model",
+    lmStudioSystemPromptPath: resolveLocalPath(
+      process.env.LMSTUDIO_SYSTEM_PROMPT_PATH ?? "tools/indexer/prompts/system_prompt.txt",
+    ),
     lmStudioTimeoutMs: asNumber("LMSTUDIO_TIMEOUT_MS", 120000),
     lmStudioMaxRetries: asNumber("LMSTUDIO_MAX_RETRIES", 2),
     cfAiEmbedModel: process.env.CF_AI_EMBED_MODEL ?? DEFAULT_CF_AI_EMBED_MODEL,
@@ -84,8 +100,8 @@ export function loadConfig(): IndexerConfig {
     acceptExtensions: parseExtensions(process.env.INDEXER_ACCEPT_EXTENSIONS),
     minExtractChars: asNumber("MIN_EXTRACT_CHARS", 500),
     pdfMinTextChars: asNumber("PDF_MIN_TEXT_CHARS", 800),
-    reportDir: path.resolve(process.env.REPORT_DIR ?? "tools/indexer/reports"),
-    outputTextDir: path.resolve(process.env.OUTPUT_TEXT_DIR ?? "tools/indexer/output_text"),
+    reportDir: resolveLocalPath(process.env.REPORT_DIR ?? "tools/indexer/reports"),
+    outputTextDir: resolveLocalPath(process.env.OUTPUT_TEXT_DIR ?? "tools/indexer/output_text"),
     htmlExtractMode: extractMode,
     storeOriginalBinary: asBoolean("STORE_ORIGINAL_BINARY", false),
     vectorBatchMaxBytes: asNumber("VECTOR_BATCH_MAX_BYTES", 95 * 1024 * 1024),

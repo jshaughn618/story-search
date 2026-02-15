@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import type { IndexerConfig, StoryMetadata } from "./types.js";
 
 interface ChatCompletionResponse {
@@ -15,6 +16,34 @@ class LmStudioRequestError extends Error {
   ) {
     super(`LM Studio chat request failed (${status}): ${responseText}`);
   }
+}
+
+const systemPromptCache = new Map<string, string>();
+
+async function loadSystemPrompt(systemPromptPath: string): Promise<string> {
+  const cached = systemPromptCache.get(systemPromptPath);
+  if (cached) {
+    return cached;
+  }
+
+  let promptText: string;
+  try {
+    promptText = await readFile(systemPromptPath, "utf8");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown error";
+    throw new Error(
+      `Failed to load LM Studio system prompt at ${systemPromptPath}: ${message}. ` +
+        "Set LMSTUDIO_SYSTEM_PROMPT_PATH or create the file.",
+    );
+  }
+
+  const normalized = promptText.trim();
+  if (!normalized) {
+    throw new Error(`LM Studio system prompt file is empty: ${systemPromptPath}`);
+  }
+
+  systemPromptCache.set(systemPromptPath, normalized);
+  return normalized;
 }
 
 function buildMetadataPrompt(storyText: string) {
@@ -133,7 +162,7 @@ async function callChatCompletion(
     return error.message.toLowerCase().includes("fetch failed");
   }
 
-  async function request(responseFormat: unknown): Promise<string> {
+  async function request(): Promise<string> {
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       signal: AbortSignal.timeout(timeoutMs),
@@ -144,7 +173,6 @@ async function callChatCompletion(
       body: JSON.stringify({
         model,
         temperature: 0.1,
-        response_format: responseFormat,
         messages,
       }),
     });
@@ -164,7 +192,7 @@ async function callChatCompletion(
   let attempt = 0;
   while (attempt <= maxRetries) {
     try {
-      return await request({ type: "text" });
+      return await request();
     } catch (error) {
       if (attempt >= maxRetries || !isRetryable(error)) {
         throw error;
@@ -183,6 +211,7 @@ async function parseMetadataWithRepair(config: IndexerConfig, raw: string): Prom
   try {
     return normalizeMetadata(JSON.parse(extractJson(raw)));
   } catch {
+    const systemPrompt = await loadSystemPrompt(config.lmStudioSystemPromptPath);
     const repairPrompt = `Fix this so it is valid JSON for the required schema and return JSON only:\n\n${raw}`;
     const repaired = await callChatCompletion(
       config.lmStudioBaseUrl,
@@ -191,7 +220,7 @@ async function parseMetadataWithRepair(config: IndexerConfig, raw: string): Prom
       config.lmStudioTimeoutMs,
       config.lmStudioMaxRetries,
       [
-        { role: "system", content: "Return valid JSON only. No prose." },
+        { role: "system", content: systemPrompt },
         { role: "user", content: repairPrompt },
       ],
     );
@@ -205,6 +234,7 @@ export async function extractStoryMetadata(
   storyText: string,
   sourcePath: string,
 ): Promise<StoryMetadata> {
+  const systemPrompt = await loadSystemPrompt(config.lmStudioSystemPromptPath);
   const textForModel = buildMetadataPrompt(storyText);
 
   const userPrompt = `Source path: ${sourcePath}
@@ -230,6 +260,7 @@ ${textForModel}`;
     config.lmStudioTimeoutMs,
     config.lmStudioMaxRetries,
     [
+      { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
   );
