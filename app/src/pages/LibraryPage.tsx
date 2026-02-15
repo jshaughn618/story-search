@@ -5,7 +5,6 @@ import { deleteStory, fetchFilters, searchStories } from "../lib/api";
 import type { FiltersResponse, SearchResponse, StoryResult, StoryStatus } from "../types";
 
 const PAGE_SIZE = 20;
-const DELETE_CONFIRM_TOKEN = "DELETE";
 
 type StatusFilterValue = StoryStatus | "ALL";
 
@@ -43,7 +42,6 @@ export function LibraryPage() {
   const [debugScores, setDebugScores] = useState(false);
   const [openMenuStoryId, setOpenMenuStoryId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoryResult | null>(null);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -174,7 +172,6 @@ export function LibraryPage() {
 
   const openDeleteDialog = (story: StoryResult) => {
     setDeleteTarget(story);
-    setDeleteConfirmText("");
     setOpenMenuStoryId(null);
   };
 
@@ -183,7 +180,6 @@ export function LibraryPage() {
       return;
     }
     setDeleteTarget(null);
-    setDeleteConfirmText("");
   };
 
   const confirmDelete = async () => {
@@ -205,7 +201,6 @@ export function LibraryPage() {
       await deleteStory(storyId);
       setToast("Story deleted.");
       setDeleteTarget(null);
-      setDeleteConfirmText("");
     } catch (deleteError) {
       setResults(previousResults);
       setTotalCandidates(previousTotalCandidates);
@@ -418,16 +413,6 @@ export function LibraryPage() {
           >
             <h3 id="delete-dialog-title">Delete story?</h3>
             <p>This will permanently delete the story and its index. This can&apos;t be undone.</p>
-            <label>
-              Type {DELETE_CONFIRM_TOKEN} to confirm
-              <input
-                type="text"
-                value={deleteConfirmText}
-                onChange={(event) => setDeleteConfirmText(event.target.value)}
-                autoComplete="off"
-                autoFocus
-              />
-            </label>
             <div className="confirm-actions">
               <button type="button" className="ghost" onClick={closeDeleteDialog} disabled={Boolean(deletingStoryId)}>
                 Cancel
@@ -435,7 +420,7 @@ export function LibraryPage() {
               <button
                 type="button"
                 className="danger-button"
-                disabled={deleteConfirmText !== DELETE_CONFIRM_TOKEN || Boolean(deletingStoryId)}
+                disabled={Boolean(deletingStoryId)}
                 onClick={() => void confirmDelete()}
               >
                 {deletingStoryId ? "Deleting..." : "Delete"}
