@@ -101,6 +101,7 @@ program
     const summary = await runIndexing(config, inputFolder, {
       changedOnly: false,
       forceReindex: options.forceReindex === true,
+      reprocessExisting: false,
     });
     console.log("\nIndex complete");
     console.log(JSON.stringify(summary, null, 2));
@@ -110,14 +111,17 @@ program
   .command("reindex")
   .argument("<folder>", "Folder containing .txt/.html/.rtf/.doc/.docx/.pdf stories")
   .option("--changed-only", "Skip files when source path + RAW_HASH are unchanged", true)
+  .option("--full", "Reprocess existing canonical stories (metadata/chunks/embeddings)", false)
   .option("--force-reindex", "Override embedding model/dimension settings mismatch checks", false)
   .description("Re-index files, optimized for changed inputs")
-  .action(async (folder: string, options: { changedOnly?: boolean; forceReindex?: boolean }) => {
+  .action(async (folder: string, options: { changedOnly?: boolean; full?: boolean; forceReindex?: boolean }) => {
     const config = loadConfig();
     const inputFolder = resolveInputFolder(folder, loadedEnvPath);
+    const full = options.full === true;
     const summary = await runIndexing(config, inputFolder, {
-      changedOnly: options.changedOnly !== false,
+      changedOnly: full ? false : options.changedOnly !== false,
       forceReindex: options.forceReindex === true,
+      reprocessExisting: full,
     });
     console.log("\nReindex complete");
     console.log(JSON.stringify(summary, null, 2));

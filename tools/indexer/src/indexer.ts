@@ -19,6 +19,7 @@ import type {
 interface RunOptions {
   changedOnly: boolean;
   forceReindex: boolean;
+  reprocessExisting: boolean;
 }
 
 interface RunSummary {
@@ -378,7 +379,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         await client.uploadRawObject(originalKey, ingest.originalBytes, getBinaryContentType(filePath));
       }
 
-      if (existingCanonical) {
+      if (existingCanonical && !options.reprocessExisting) {
         await client.upsertStorySource({
           storyId,
           sourcePath: ingest.sourcePath,
