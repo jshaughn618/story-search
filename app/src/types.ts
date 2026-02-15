@@ -49,10 +49,11 @@ export interface StoryResult {
 }
 
 export interface SearchResponse {
-  mode: "browse" | "semantic";
+  mode: "browse" | "semantic" | "exact";
   items: StoryResult[];
   nextOffset: number | null;
   totalCandidates?: number;
+  scannedCandidates?: number;
 }
 
 export interface SearchRequest {

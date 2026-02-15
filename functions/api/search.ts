@@ -15,6 +15,9 @@ const MAX_LIMIT = 50;
 const DEFAULT_STATUSES: StoryStatus[] = [];
 const VECTOR_MAX_TOPK_WITH_ALL_METADATA = 50;
 const VECTOR_MAX_TOPK_WITH_INDEXED_METADATA = 100;
+const EXACT_SCAN_BATCH_SIZE = 80;
+const EXACT_SCAN_MAX_CANDIDATES = 5000;
+const EXACT_SCAN_CONCURRENCY = 12;
 
 interface VectorMatch {
   id: string;
@@ -26,6 +29,13 @@ interface AggregatedResult {
   storyId: string;
   chunkIndex: number;
   score: number;
+  excerpt: string;
+}
+
+interface ChunkMapItem {
+  chunkIndex: number;
+  startChar: number;
+  endChar: number;
   excerpt: string;
 }
 
@@ -90,6 +100,53 @@ function clampLimit(limit?: number): number {
     return DEFAULT_LIMIT;
   }
   return Math.max(1, Math.min(MAX_LIMIT, Math.trunc(limit)));
+}
+
+function parseExactQuotedQuery(q: string): string | null {
+  const trimmed = q.trim();
+  if (trimmed.length < 2) {
+    return null;
+  }
+  if (!trimmed.startsWith("\"") || !trimmed.endsWith("\"")) {
+    return null;
+  }
+  const inner = trimmed.slice(1, -1);
+  return inner.length > 0 ? inner : null;
+}
+
+function buildSnippet(text: string, startIndex: number, matchLength: number): string {
+  const radius = 120;
+  const from = Math.max(0, startIndex - radius);
+  const to = Math.min(text.length, startIndex + matchLength + radius);
+  return text
+    .slice(from, to)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await mapper(items[index]);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
 }
 
 function normalizeOffset(offset?: number): number {
@@ -164,7 +221,35 @@ function storyMatchesStatus(story: StoryRow, statuses: StoryStatus[]): boolean {
 async function runBrowseQuery(env: Env, filters: Required<SearchFilters>, limit: number, offset: number) {
   const clauses: string[] = [];
   const params: (string | number)[] = [];
+  applyFilterClauses(filters, clauses, params);
 
+  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+
+  const sql = `
+    SELECT STORY_ID, TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG, GENRE, TONE, SETTING,
+           TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
+           STORY_STATUS, SOURCE_COUNT, STATUS_NOTES
+    FROM STORIES
+    ${whereClause}
+    ORDER BY UPDATED_AT DESC
+    LIMIT ? OFFSET ?
+  `;
+
+  const result = await env.STORY_DB.prepare(sql).bind(...params, limit, offset).all<StoryRow>();
+  const rows = result.results ?? [];
+
+  return {
+    items: rows.map((row) => ({ ...mapStory(row), bestChunk: null })),
+    nextOffset: rows.length < limit ? null : offset + limit,
+    mode: "browse" as const,
+  };
+}
+
+function applyFilterClauses(
+  filters: Required<SearchFilters>,
+  clauses: string[],
+  params: (string | number)[],
+) {
   if (filters.genre) {
     clauses.push("GENRE = ?");
     params.push(filters.genre);
@@ -194,9 +279,20 @@ async function runBrowseQuery(env: Env, filters: Required<SearchFilters>, limit:
     `);
     params.push(...filters.tags, filters.tags.length);
   }
+}
+
+async function runExactQuery(
+  env: Env,
+  exactTerm: string,
+  filters: Required<SearchFilters>,
+  limit: number,
+  offset: number,
+) {
+  const clauses: string[] = [];
+  const params: (string | number)[] = [];
+  applyFilterClauses(filters, clauses, params);
 
   const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
-
   const sql = `
     SELECT STORY_ID, TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG, GENRE, TONE, SETTING,
            TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
@@ -207,13 +303,89 @@ async function runBrowseQuery(env: Env, filters: Required<SearchFilters>, limit:
     LIMIT ? OFFSET ?
   `;
 
-  const result = await env.STORY_DB.prepare(sql).bind(...params, limit, offset).all<StoryRow>();
-  const rows = result.results ?? [];
+  const needed = offset + limit;
+  const matches: Array<ReturnType<typeof mapStory> & {
+    bestChunk: { chunkIndex: number; score: number; excerpt: string } | null;
+  }> = [];
+  let scanned = 0;
+  let dbOffset = 0;
+  let done = false;
+
+  while (!done && matches.length < needed && scanned < EXACT_SCAN_MAX_CANDIDATES) {
+    const batchResult = await env.STORY_DB.prepare(sql)
+      .bind(...params, EXACT_SCAN_BATCH_SIZE, dbOffset)
+      .all<StoryRow>();
+    const rows = batchResult.results ?? [];
+
+    if (rows.length === 0) {
+      break;
+    }
+
+    dbOffset += rows.length;
+    scanned += rows.length;
+
+    const rowMatches = await mapWithConcurrency(rows, EXACT_SCAN_CONCURRENCY, async (row) => {
+      const textObject = await env.STORY_BUCKET.get(row.R2_KEY);
+      if (!textObject) {
+        return null;
+      }
+
+      const text = await textObject.text();
+      const startIndex = text.indexOf(exactTerm);
+      if (startIndex < 0) {
+        return null;
+      }
+
+      let chunkIndex = 0;
+      let excerpt = buildSnippet(text, startIndex, exactTerm.length);
+
+      if (row.CHUNKS_KEY) {
+        const chunksObject = await env.STORY_BUCKET.get(row.CHUNKS_KEY);
+        if (chunksObject) {
+          try {
+            const chunks = await chunksObject.json<ChunkMapItem[]>();
+            if (Array.isArray(chunks)) {
+              const matchedChunk = chunks.find(
+                (chunk) => startIndex >= chunk.startChar && startIndex < chunk.endChar,
+              );
+              if (matchedChunk) {
+                chunkIndex = matchedChunk.chunkIndex;
+                excerpt = matchedChunk.excerpt || excerpt;
+              }
+            }
+          } catch {
+            // ignore invalid chunk map and use fallback snippet
+          }
+        }
+      }
+
+      return {
+        ...mapStory(row),
+        bestChunk: {
+          chunkIndex,
+          score: 1,
+          excerpt,
+        },
+      };
+    });
+
+    for (const match of rowMatches) {
+      if (match) {
+        matches.push(match);
+      }
+      if (matches.length >= needed) {
+        done = true;
+        break;
+      }
+    }
+  }
 
   return {
-    items: rows.map((row) => ({ ...mapStory(row), bestChunk: null })),
-    nextOffset: rows.length < limit ? null : offset + limit,
-    mode: "browse" as const,
+    mode: "exact" as const,
+    items: matches.slice(offset, offset + limit),
+    totalCandidates: matches.length,
+    scannedCandidates: scanned,
+    nextOffset: matches.length > offset + limit ? offset + limit : null,
   };
 }
 
@@ -225,10 +397,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const filters = normalizeFilters(body.filters);
     const limit = clampLimit(body.limit);
     const offset = normalizeOffset(body.offset);
+    const exactTerm = parseExactQuotedQuery(q);
 
     if (!q) {
       const browseResponse = await runBrowseQuery(env, filters, limit, offset);
       return json(browseResponse);
+    }
+
+    if (exactTerm !== null) {
+      const exactResponse = await runExactQuery(env, exactTerm, filters, limit, offset);
+      return json(exactResponse);
     }
 
     const aiResponse = await env.AI.run(embeddingModel, { text: [q] });
