@@ -107,11 +107,20 @@ function parseExactQuotedQuery(q: string): string | null {
   if (trimmed.length < 2) {
     return null;
   }
-  if (!trimmed.startsWith("\"") || !trimmed.endsWith("\"")) {
-    return null;
+
+  const quotePairs: Array<[string, string]> = [
+    ["\"", "\""],
+    ["“", "”"],
+  ];
+
+  for (const [open, close] of quotePairs) {
+    if (trimmed.startsWith(open) && trimmed.endsWith(close)) {
+      const inner = trimmed.slice(open.length, trimmed.length - close.length);
+      return inner.length > 0 ? inner : null;
+    }
   }
-  const inner = trimmed.slice(1, -1);
-  return inner.length > 0 ? inner : null;
+
+  return null;
 }
 
 function buildSnippet(text: string, startIndex: number, matchLength: number): string {
@@ -350,7 +359,6 @@ async function runExactQuery(
               );
               if (matchedChunk) {
                 chunkIndex = matchedChunk.chunkIndex;
-                excerpt = matchedChunk.excerpt || excerpt;
               }
             }
           } catch {
