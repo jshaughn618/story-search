@@ -81,7 +81,7 @@ export function LibraryPage() {
     try {
       const tagsToUse = overrides?.tags ?? selectedTags;
       const hideReadToUse = overrides?.hideRead ?? hideRead;
-      const response = await searchStories({
+      const baseRequest = {
         q: query,
         filters: {
           genre: genre || null,
@@ -92,8 +92,40 @@ export function LibraryPage() {
         },
         limit: PAGE_SIZE,
         offset: next,
+      };
+
+      let response = await searchStories({
+        ...baseRequest,
         cursor,
       });
+
+      if (response.mode === "exact" && response.items.length < PAGE_SIZE && response.nextCursor) {
+        const combinedItems = [...response.items];
+        let rollingCursor: string | null = response.nextCursor;
+        let requestCount = 0;
+
+        while (rollingCursor && combinedItems.length < PAGE_SIZE && requestCount < 8) {
+          const nextResponse = await searchStories({
+            ...baseRequest,
+            cursor: rollingCursor,
+          });
+
+          if (nextResponse.mode !== "exact") {
+            break;
+          }
+
+          combinedItems.push(...nextResponse.items);
+          rollingCursor = nextResponse.nextCursor ?? null;
+          requestCount += 1;
+        }
+
+        response = {
+          ...response,
+          items: combinedItems.slice(0, PAGE_SIZE),
+          nextCursor: rollingCursor,
+          nextOffset: rollingCursor ? next + PAGE_SIZE : null,
+        };
+      }
 
       setResults(response.items);
       setMode(response.mode);
