@@ -4,6 +4,8 @@ import type {
   SearchRequest,
   SearchResponse,
   StoryDetailResponse,
+  StoryUpdateRequest,
+  StoryUpdateResponse,
 } from "../types";
 
 export class ApiError extends Error {
@@ -66,5 +68,12 @@ export function fetchStory(storyId: string, chunk?: number | null) {
 export function deleteStory(storyId: string) {
   return apiRequest<DeleteStoryResponse>(`/api/story/${storyId}`, {
     method: "DELETE",
+  });
+}
+
+export function updateStory(storyId: string, body: StoryUpdateRequest) {
+  return apiRequest<StoryUpdateResponse>(`/api/story/${storyId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
   });
 }

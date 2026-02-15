@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { deleteStory, fetchFilters, searchStories } from "../lib/api";
+import { deleteStory, fetchFilters, searchStories, updateStory } from "../lib/api";
 import type { FiltersResponse, SearchResponse, StoryResult, StoryStatus } from "../types";
 
 const PAGE_SIZE = 20;
@@ -13,6 +13,7 @@ const emptyFilters: FiltersResponse = {
   tones: [],
   tags: [],
   statuses: [],
+  totalStories: 0,
 };
 
 const statusLabel: Record<StatusFilterValue, string> = {
@@ -34,6 +35,7 @@ export function LibraryPage() {
   const [tone, setTone] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("ALL");
+  const [hideRead, setHideRead] = useState(false);
   const [results, setResults] = useState<StoryResult[]>([]);
   const [mode, setMode] = useState<SearchResponse["mode"]>("browse");
   const [nextOffset, setNextOffset] = useState<number | null>(null);
@@ -46,27 +48,47 @@ export function LibraryPage() {
   const [openMenuStoryId, setOpenMenuStoryId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoryResult | null>(null);
   const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
+  const [updatingStoryId, setUpdatingStoryId] = useState<string | null>(null);
+  const [tagQuery, setTagQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const activeFilters = useMemo(() => {
     const statusActive = statusFilter === "ALL" ? 0 : 1;
-    return [genre, tone, ...selectedTags].filter(Boolean).length + statusActive;
-  }, [genre, tone, selectedTags, statusFilter]);
+    const readActive = hideRead ? 1 : 0;
+    return [genre, tone, ...selectedTags].filter(Boolean).length + statusActive + readActive;
+  }, [genre, tone, selectedTags, statusFilter, hideRead]);
 
-  const runSearch = async (next = 0, cursor: string | null = null) => {
+  const filteredTagOptions = useMemo(() => {
+    const q = tagQuery.trim().toLowerCase();
+    if (!q) {
+      return filters.tags.slice(0, 60);
+    }
+    return filters.tags
+      .filter((tagInfo) => tagInfo.tag.toLowerCase().includes(q))
+      .slice(0, 60);
+  }, [filters.tags, tagQuery]);
+
+  const runSearch = async (
+    next = 0,
+    cursor: string | null = null,
+    overrides?: { tags?: string[]; hideRead?: boolean },
+  ) => {
     setLoading(true);
     setError(null);
 
     try {
+      const tagsToUse = overrides?.tags ?? selectedTags;
+      const hideReadToUse = overrides?.hideRead ?? hideRead;
       const response = await searchStories({
         q: query,
         filters: {
           genre: genre || null,
           tone: tone || null,
-          tags: selectedTags,
+          tags: tagsToUse,
           statuses: statusFilter === "ALL" ? [] : [statusFilter],
+          hideRead: hideReadToUse,
         },
         limit: PAGE_SIZE,
         offset: next,
@@ -117,9 +139,13 @@ export function LibraryPage() {
   };
 
   const toggleTag = (tag: string) => {
-    setSelectedTags((current) =>
-      current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag],
-    );
+    setSelectedTags((current) => {
+      const next = current.includes(tag)
+        ? current.filter((value) => value !== tag)
+        : [...current, tag];
+      void runSearch(0, null, { tags: next });
+      return next;
+    });
   };
 
   const clearFilters = () => {
@@ -127,6 +153,16 @@ export function LibraryPage() {
     setTone("");
     setSelectedTags([]);
     setStatusFilter("ALL");
+    setHideRead(false);
+  };
+
+  const refreshFilters = async () => {
+    try {
+      const response = await fetchFilters();
+      setFilters(response);
+    } catch {
+      // noop
+    }
   };
 
   useEffect(() => {
@@ -216,6 +252,10 @@ export function LibraryPage() {
       await deleteStory(storyId);
       setToast("Story deleted.");
       setDeleteTarget(null);
+      setFilters((current) => ({
+        ...current,
+        totalStories: Math.max(0, current.totalStories - 1),
+      }));
     } catch (deleteError) {
       setResults(previousResults);
       setTotalCandidates(previousTotalCandidates);
@@ -226,11 +266,92 @@ export function LibraryPage() {
     }
   };
 
+  const patchStoryInResults = (storyId: string, patch: Partial<StoryResult>) => {
+    setResults((current) =>
+      current.map((item) => (item.storyId === storyId ? { ...item, ...patch } : item)),
+    );
+  };
+
+  const toggleRead = async (story: StoryResult) => {
+    if (updatingStoryId) {
+      return;
+    }
+    const previous = story.isRead;
+    patchStoryInResults(story.storyId, { isRead: !previous });
+    setUpdatingStoryId(story.storyId);
+
+    try {
+      const response = await updateStory(story.storyId, { isRead: !previous });
+      patchStoryInResults(story.storyId, {
+        isRead: response.story.isRead,
+      });
+    } catch (updateError) {
+      patchStoryInResults(story.storyId, { isRead: previous });
+      const message = updateError instanceof Error ? updateError.message : "Failed to update read status";
+      setToast(`Update failed: ${message}`);
+    } finally {
+      setUpdatingStoryId(null);
+    }
+  };
+
+  const addUserTag = async (story: StoryResult) => {
+    if (updatingStoryId) {
+      return;
+    }
+    const input = window.prompt(`Add a custom tag for "${story.title}"`);
+    if (!input) {
+      return;
+    }
+    const newTag = input.trim();
+    if (!newTag) {
+      return;
+    }
+
+    setUpdatingStoryId(story.storyId);
+    try {
+      const response = await updateStory(story.storyId, { addUserTag: newTag });
+      patchStoryInResults(story.storyId, {
+        tags: response.story.tags,
+        userTags: response.story.userTags,
+      });
+      await refreshFilters();
+      setToast("Tag added.");
+    } catch (updateError) {
+      const message = updateError instanceof Error ? updateError.message : "Failed to add tag";
+      setToast(`Tag update failed: ${message}`);
+    } finally {
+      setUpdatingStoryId(null);
+    }
+  };
+
+  const removeUserTag = async (story: StoryResult, tag: string) => {
+    if (updatingStoryId) {
+      return;
+    }
+    setUpdatingStoryId(story.storyId);
+    try {
+      const response = await updateStory(story.storyId, { removeUserTag: tag });
+      patchStoryInResults(story.storyId, {
+        tags: response.story.tags,
+        userTags: response.story.userTags,
+      });
+      await refreshFilters();
+      setToast("Tag removed.");
+    } catch (updateError) {
+      const message = updateError instanceof Error ? updateError.message : "Failed to remove tag";
+      setToast(`Tag update failed: ${message}`);
+    } finally {
+      setUpdatingStoryId(null);
+    }
+  };
+
   return (
     <main className="library-page">
       <section className="hero">
         <h1>Story Library</h1>
-        <p>Semantic search + metadata browse for your indexed corpus.</p>
+        <p>
+          Semantic search + metadata browse for your indexed corpus. {filters.totalStories.toLocaleString()} stories in library.
+        </p>
       </section>
 
       <section className="search-panel">
@@ -303,10 +424,29 @@ export function LibraryPage() {
             />
             Show debug
           </label>
+          <label className="checkbox-inline">
+            <input
+              type="checkbox"
+              checked={hideRead}
+              onChange={(event) => {
+                const nextHideRead = event.target.checked;
+                setHideRead(nextHideRead);
+                void runSearch(0, null, { hideRead: nextHideRead });
+              }}
+            />
+            Hide read
+          </label>
         </div>
 
         <div className="tag-cloud">
-          {filters.tags.slice(0, 30).map((tagInfo) => {
+          <input
+            type="search"
+            placeholder="Search tags..."
+            value={tagQuery}
+            onChange={(event) => setTagQuery(event.target.value)}
+            aria-label="Search available tags"
+          />
+          {filteredTagOptions.map((tagInfo) => {
             const selected = selectedTags.includes(tagInfo.tag);
             return (
               <button
@@ -342,6 +482,7 @@ export function LibraryPage() {
           const menuOpen = openMenuStoryId === story.storyId;
           const deleting = deletingStoryId === story.storyId;
           const metaParts = [
+            story.isRead ? "Read" : "Unread",
             story.genre && story.genre.trim().toLowerCase() !== "unknown" ? story.genre : null,
             story.tone && story.tone.trim().toLowerCase() !== "unknown" ? story.tone : null,
             `${story.wordCount} words`,
@@ -382,6 +523,22 @@ export function LibraryPage() {
                       <button
                         type="button"
                         role="menuitem"
+                        className="story-menu-item"
+                        onClick={() => void toggleRead(story)}
+                      >
+                        {story.isRead ? "Mark unread" : "Mark read"}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="story-menu-item"
+                        onClick={() => void addUserTag(story)}
+                      >
+                        Add tag
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
                         className="story-menu-item danger"
                         onClick={() => openDeleteDialog(story)}
                       >
@@ -400,6 +557,17 @@ export function LibraryPage() {
                   <span key={tag} className="tag-pill">
                     {tag}
                   </span>
+                ))}
+                {story.userTags.map((tag) => (
+                  <button
+                    key={`user-${story.storyId}-${tag}`}
+                    type="button"
+                    className="tag-pill"
+                    onClick={() => void removeUserTag(story, tag)}
+                    title="Remove custom tag"
+                  >
+                    {tag} ×
+                  </button>
                 ))}
               </div>
 

@@ -13,6 +13,16 @@ interface VectorMatchId {
   id: string;
 }
 
+interface StoryPatchBody {
+  isRead?: boolean;
+  addUserTag?: string;
+  removeUserTag?: string;
+}
+
+interface UserTagRow {
+  TAG: string;
+}
+
 const VECTOR_DELETE_BATCH_SIZE = 500;
 const VECTOR_QUERY_TOP_K = 50;
 const VECTOR_CLEANUP_MAX_PASSES = 200;
@@ -136,8 +146,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request })
     const dbResult = await env.STORY_DB.prepare(
       `
       SELECT STORY_ID, TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG, GENRE, TONE, SETTING,
-             TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
-             STORY_STATUS, SOURCE_COUNT, STATUS_NOTES
+             TAGS_JSON, USER_TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
+             STORY_STATUS, SOURCE_COUNT, STATUS_NOTES, IS_READ
       FROM STORIES
       WHERE STORY_ID = ?
     `,
@@ -190,6 +200,115 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request })
   }
 };
 
+function normalizeUserTag(input: unknown): string | null {
+  if (typeof input !== "string") {
+    return null;
+  }
+  const normalized = input.trim().replace(/\s+/g, " ");
+  if (!normalized) {
+    return null;
+  }
+  if (normalized.length > 64) {
+    return null;
+  }
+  return normalized;
+}
+
+async function refreshStoryUserTags(env: Env, storyId: string): Promise<string[]> {
+  const tagsResult = await env.STORY_DB.prepare(
+    "SELECT TAG FROM STORY_USER_TAGS WHERE STORY_ID = ? ORDER BY TAG ASC",
+  )
+    .bind(storyId)
+    .all<UserTagRow>();
+
+  const tags = (tagsResult.results ?? []).map((row) => row.TAG);
+  await env.STORY_DB.prepare("UPDATE STORIES SET USER_TAGS_JSON = ? WHERE STORY_ID = ?")
+    .bind(JSON.stringify(tags), storyId)
+    .run();
+
+  return tags;
+}
+
+export const onRequestPatch: PagesFunction<Env> = async ({ env, params, request }) => {
+  try {
+    const storyParam = params.id;
+    const storyId = typeof storyParam === "string" ? storyParam.trim() : "";
+    if (!storyId) {
+      return errorResponse("Missing story id", 400);
+    }
+
+    const existing = await env.STORY_DB.prepare("SELECT STORY_ID FROM STORIES WHERE STORY_ID = ?")
+      .bind(storyId)
+      .first<{ STORY_ID: string }>();
+    if (!existing) {
+      return errorResponse("Story not found", 404);
+    }
+
+    let body: StoryPatchBody = {};
+    try {
+      body = (await request.json()) as StoryPatchBody;
+    } catch {
+      return errorResponse("Invalid JSON body", 400);
+    }
+
+    const hasReadUpdate = typeof body.isRead === "boolean";
+    const addTag = normalizeUserTag(body.addUserTag);
+    const removeTag = normalizeUserTag(body.removeUserTag);
+    if (!hasReadUpdate && !addTag && !removeTag) {
+      return errorResponse("No valid changes in payload", 400);
+    }
+
+    if (hasReadUpdate) {
+      await env.STORY_DB.prepare("UPDATE STORIES SET IS_READ = ? WHERE STORY_ID = ?")
+        .bind(body.isRead ? 1 : 0, storyId)
+        .run();
+    }
+
+    if (addTag) {
+      await env.STORY_DB.prepare("INSERT OR IGNORE INTO USER_TAGS (TAG) VALUES (?)").bind(addTag).run();
+      await env.STORY_DB.prepare("INSERT OR IGNORE INTO STORY_USER_TAGS (STORY_ID, TAG) VALUES (?, ?)")
+        .bind(storyId, addTag)
+        .run();
+    }
+
+    if (removeTag) {
+      await env.STORY_DB.prepare("DELETE FROM STORY_USER_TAGS WHERE STORY_ID = ? AND TAG = ?")
+        .bind(storyId, removeTag)
+        .run();
+    }
+
+    if (addTag || removeTag) {
+      await refreshStoryUserTags(env, storyId);
+      await env.STORY_DB.prepare("DELETE FROM USER_TAGS WHERE TAG NOT IN (SELECT DISTINCT TAG FROM STORY_USER_TAGS)").run();
+    }
+
+    const updated = await env.STORY_DB.prepare(
+      `
+      SELECT STORY_ID, TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG, GENRE, TONE, SETTING,
+             TAGS_JSON, USER_TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
+             STORY_STATUS, SOURCE_COUNT, STATUS_NOTES, IS_READ
+      FROM STORIES
+      WHERE STORY_ID = ?
+    `,
+    )
+      .bind(storyId)
+      .first<StoryRow>();
+
+    if (!updated) {
+      return errorResponse("Story not found", 404);
+    }
+
+    return json({
+      ok: true,
+      story: mapStory(updated),
+    });
+  } catch (error) {
+    console.error("/api/story/:id patch error", error);
+    const message = error instanceof Error ? error.message : "Failed to update story";
+    return errorResponse(message, 500);
+  }
+};
+
 export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
   try {
     const storyParam = params.id;
@@ -219,8 +338,18 @@ export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
 
     await runDeleteIfTableExists(env, "DELETE FROM STORY_SOURCES WHERE STORY_ID = ?", storyId);
     await runDeleteIfTableExists(env, "DELETE FROM STORY_TAGS WHERE STORY_ID = ?", storyId);
+    await runDeleteIfTableExists(env, "DELETE FROM STORY_USER_TAGS WHERE STORY_ID = ?", storyId);
     await env.STORY_DB.prepare("DELETE FROM STORIES WHERE STORY_ID = ?").bind(storyId).run();
     await env.STORY_DB.prepare("DELETE FROM TAGS WHERE TAG NOT IN (SELECT DISTINCT TAG FROM STORY_TAGS)").run();
+    try {
+      await env.STORY_DB.prepare(
+        "DELETE FROM USER_TAGS WHERE TAG NOT IN (SELECT DISTINCT TAG FROM STORY_USER_TAGS)",
+      ).run();
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.toLowerCase().includes("no such table")) {
+        throw error;
+      }
+    }
 
     return json({
       ok: true,

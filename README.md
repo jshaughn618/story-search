@@ -4,6 +4,8 @@ Login-only story library with:
 - Semantic search (Workers AI query embeddings + Vectorize)
 - Metadata browse/filter (D1)
 - Reader view from canonical plain text in R2
+- Per-story read/unread state
+- Custom user tags (add/remove) with tag search/filter
 - Local indexer with mixed-format ingest, normalization, dedupe, and cleanup reporting
 
 ## Embedding Strategy (Production)
@@ -75,6 +77,7 @@ Migrations:
 - `db/migrations/0003_settings.sql`
 - `db/migrations/0004_add_author.sql`
 - `db/migrations/0005_chunk_count_hardening.sql`
+- `db/migrations/0006_user_tags_and_read.sql`
 
 `STORIES` includes:
 - `RAW_HASH`
@@ -93,6 +96,13 @@ Migrations:
 - `EXTRACT_METHOD`
 - `RAW_HASH`
 - `INGESTED_AT`
+
+`STORY_USER_TAGS` includes:
+- `STORY_ID`
+- `TAG`
+
+`USER_TAGS` includes:
+- `TAG`
 
 `SETTINGS` includes:
 - `embedding_model_name`

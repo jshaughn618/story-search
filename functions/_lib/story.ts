@@ -14,6 +14,8 @@ export function parseStringArray(jsonString: string | null | undefined): string[
 }
 
 export function mapStory(row: StoryRow) {
+  const userTags = parseStringArray(row.USER_TAGS_JSON);
+
   return {
     storyId: row.STORY_ID,
     title: row.TITLE,
@@ -24,11 +26,13 @@ export function mapStory(row: StoryRow) {
     tone: row.TONE,
     setting: row.SETTING,
     tags: parseStringArray(row.TAGS_JSON),
+    userTags,
     themes: parseStringArray(row.THEMES_JSON),
     wordCount: row.WORD_COUNT,
     updatedAt: row.UPDATED_AT,
     storyStatus: row.STORY_STATUS,
     sourceCount: row.SOURCE_COUNT,
     statusNotes: row.STATUS_NOTES,
+    isRead: row.IS_READ === 1,
   };
 }

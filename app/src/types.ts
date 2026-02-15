@@ -21,6 +21,7 @@ export interface FiltersResponse {
   tones: string[];
   tags: TagCount[];
   statuses: StatusCount[];
+  totalStories: number;
 }
 
 export interface BestChunk {
@@ -39,12 +40,14 @@ export interface StoryResult {
   tone: string | null;
   setting: string | null;
   tags: string[];
+  userTags: string[];
   themes: string[];
   wordCount: number;
   updatedAt: string;
   storyStatus: StoryStatus;
   sourceCount: number;
   statusNotes: string | null;
+  isRead: boolean;
   bestChunk: BestChunk | null;
 }
 
@@ -64,6 +67,7 @@ export interface SearchRequest {
     tone: string | null;
     tags: string[];
     statuses: StoryStatus[];
+    hideRead?: boolean;
   };
   limit: number;
   offset: number;
@@ -87,6 +91,17 @@ export interface StoryDetailResponse {
 export interface DeleteStoryResponse {
   ok: boolean;
   storyId: string;
+}
+
+export interface StoryUpdateRequest {
+  isRead?: boolean;
+  addUserTag?: string;
+  removeUserTag?: string;
+}
+
+export interface StoryUpdateResponse {
+  ok: boolean;
+  story: Omit<StoryResult, "bestChunk">;
 }
 
 export type ReaderTheme = "light" | "dark" | "sepia";

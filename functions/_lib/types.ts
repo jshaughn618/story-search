@@ -22,6 +22,7 @@ export interface SearchFilters {
   tone?: string | null;
   tags?: string[];
   statuses?: StoryStatus[];
+  hideRead?: boolean;
 }
 
 export interface SearchRequestBody {
@@ -50,6 +51,8 @@ export interface StoryRow {
   STORY_STATUS: StoryStatus;
   SOURCE_COUNT: number;
   STATUS_NOTES: string | null;
+  IS_READ: number;
+  USER_TAGS_JSON: string;
 }
 
 export interface ChunkMapItem {

@@ -84,8 +84,9 @@ function normalizeFilters(filters?: SearchFilters): Required<SearchFilters> {
     ? filters.tags.map((tag) => tag.trim()).filter(Boolean)
     : [];
   const statuses = normalizeStatuses(filters?.statuses);
+  const hideRead = filters?.hideRead === true;
 
-  return { genre, tone, tags, statuses };
+  return { genre, tone, tags, statuses, hideRead };
 }
 
 function clampLimit(limit?: number): number {
@@ -178,8 +179,8 @@ async function fetchStoriesByIds(env: Env, storyIds: string[]): Promise<Map<stri
   const placeholders = storyIds.map(() => "?").join(",");
   const sql = `
     SELECT STORY_ID, TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG, GENRE, TONE, SETTING,
-           TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
-           STORY_STATUS, SOURCE_COUNT, STATUS_NOTES
+           TAGS_JSON, USER_TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
+           STORY_STATUS, SOURCE_COUNT, STATUS_NOTES, IS_READ
     FROM STORIES
     WHERE STORY_ID IN (${placeholders})
   `;
@@ -199,7 +200,11 @@ function storyHasTags(story: StoryRow, selectedTags: string[]): boolean {
   if (selectedTags.length === 0) {
     return true;
   }
-  const tagSet = new Set(parseStringArray(story.TAGS_JSON).map((tag) => tag.toLowerCase()));
+  const tagSet = new Set(
+    [...parseStringArray(story.TAGS_JSON), ...parseStringArray(story.USER_TAGS_JSON)].map((tag) =>
+      tag.toLowerCase(),
+    ),
+  );
   return selectedTags.every((tag) => tagSet.has(tag.toLowerCase()));
 }
 
@@ -208,6 +213,13 @@ function storyMatchesStatus(story: StoryRow, statuses: StoryStatus[]): boolean {
     return true;
   }
   return statuses.includes(story.STORY_STATUS);
+}
+
+function storyMatchesReadFilter(story: StoryRow, hideRead: boolean): boolean {
+  if (!hideRead) {
+    return true;
+  }
+  return story.IS_READ !== 1;
 }
 
 async function runBrowseQuery(env: Env, filters: Required<SearchFilters>, limit: number, offset: number) {
@@ -219,8 +231,8 @@ async function runBrowseQuery(env: Env, filters: Required<SearchFilters>, limit:
 
   const sql = `
     SELECT STORY_ID, TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG, GENRE, TONE, SETTING,
-           TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
-           STORY_STATUS, SOURCE_COUNT, STATUS_NOTES
+           TAGS_JSON, USER_TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
+           STORY_STATUS, SOURCE_COUNT, STATUS_NOTES, IS_READ
     FROM STORIES
     ${whereClause}
     ORDER BY UPDATED_AT DESC
@@ -263,13 +275,21 @@ function applyFilterClauses(
     clauses.push(`
       STORY_ID IN (
         SELECT STORY_ID
-        FROM STORY_TAGS
+        FROM (
+          SELECT STORY_ID, TAG FROM STORY_TAGS
+          UNION
+          SELECT STORY_ID, TAG FROM STORY_USER_TAGS
+        )
         WHERE TAG IN (${tagPlaceholders})
         GROUP BY STORY_ID
         HAVING COUNT(DISTINCT TAG) = ?
       )
     `);
     params.push(...filters.tags, filters.tags.length);
+  }
+
+  if (filters.hideRead) {
+    clauses.push("IS_READ = 0");
   }
 }
 
@@ -289,8 +309,8 @@ async function runExactQuery(
   const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
   const sql = `
     SELECT STORY_ID, TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG, GENRE, TONE, SETTING,
-           TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
-           STORY_STATUS, SOURCE_COUNT, STATUS_NOTES
+           TAGS_JSON, USER_TAGS_JSON, THEMES_JSON, WORD_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT,
+           STORY_STATUS, SOURCE_COUNT, STATUS_NOTES, IS_READ
     FROM STORIES
     ${whereClause}
     ORDER BY UPDATED_AT DESC
@@ -452,7 +472,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           return null;
         }
 
-        if (!storyHasTags(story, filters.tags) || !storyMatchesStatus(story, filters.statuses)) {
+        if (
+          !storyHasTags(story, filters.tags) ||
+          !storyMatchesStatus(story, filters.statuses) ||
+          !storyMatchesReadFilter(story, filters.hideRead)
+        ) {
           return null;
         }
 
