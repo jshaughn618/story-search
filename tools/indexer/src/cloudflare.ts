@@ -126,12 +126,11 @@ export class CloudflareClient {
       INSERT INTO STORIES (
         STORY_ID, SOURCE_PATH, CONTENT_HASH, RAW_HASH, CANON_HASH, STORY_STATUS,
         SOURCE_COUNT, CANON_TEXT_SOURCE, EXTRACT_METHOD, STATUS_NOTES,
-        HEADER_TAG_CODES_JSON,
         TITLE, AUTHOR, SUMMARY_SHORT, SUMMARY_LONG,
         GENRE, TONE, SETTING, TAGS_JSON, THEMES_JSON, CONTENT_NOTES_JSON,
         WORD_COUNT, CHUNK_COUNT, R2_KEY, CHUNKS_KEY, UPDATED_AT
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(STORY_ID) DO UPDATE SET
         SOURCE_PATH = excluded.SOURCE_PATH,
         CONTENT_HASH = excluded.CONTENT_HASH,
@@ -142,7 +141,6 @@ export class CloudflareClient {
         CANON_TEXT_SOURCE = excluded.CANON_TEXT_SOURCE,
         EXTRACT_METHOD = excluded.EXTRACT_METHOD,
         STATUS_NOTES = excluded.STATUS_NOTES,
-        HEADER_TAG_CODES_JSON = excluded.HEADER_TAG_CODES_JSON,
         TITLE = excluded.TITLE,
         AUTHOR = excluded.AUTHOR,
         SUMMARY_SHORT = excluded.SUMMARY_SHORT,
@@ -170,7 +168,6 @@ export class CloudflareClient {
         story.canonTextSource,
         story.extractMethod,
         story.statusNotes,
-        JSON.stringify(story.headerTagCodes),
         story.title,
         story.author,
         story.summaryShort,

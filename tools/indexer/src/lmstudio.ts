@@ -1,4 +1,4 @@
-import type { IndexerConfig, MetadataInput, StoryMetadata } from "./types.js";
+import type { IndexerConfig, StoryMetadata } from "./types.js";
 
 interface ChatCompletionResponse {
   choices?: Array<{
@@ -23,131 +23,34 @@ const STORY_METADATA_JSON_SCHEMA = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: [
-      "title",
-      "author",
-      "summary_short",
-      "summary_long",
-      "genre",
-      "tone",
-      "setting",
-      "themes",
-      "tags",
-      "content_notes",
-    ],
+    required: ["title", "author", "summary_short", "summary_long", "themes", "tags"],
     properties: {
       title: { type: "string" },
       author: { anyOf: [{ type: "string" }, { type: "null" }] },
       summary_short: { type: "string" },
       summary_long: { type: "string" },
-      genre: { type: "string" },
-      tone: { type: "string" },
-      setting: { type: "string" },
-      themes: { type: "array", items: { type: "string" }, maxItems: 5 },
-      tags: { type: "array", items: { type: "string" }, maxItems: 12 },
-      content_notes: { type: "array", items: { type: "string" }, maxItems: 8 },
+      themes: { type: "array", items: { type: "string" }, maxItems: 8 },
+      tags: { type: "array", items: { type: "string" }, maxItems: 16 },
     },
   },
 } as const;
 
-const HEADER_CODE_TAG_LOOKUP: Record<string, string> = {
-  "1st": "First Person",
-  anal: "Anal",
-  beast: "Bestiality",
-  cpls: "Couples",
-  creampie: "Creampie",
-  fantasy: "Fantasy",
-  ff: "FF",
-  ffm: "FFM",
-  fmf: "FMF",
-  intr: "Interracial",
-  mast: "Masturbation",
-  mf: "MF",
-  mm: "MM",
-  mmf: "MMF",
-  "m+_f": "MF",
-  "m_f": "MF",
-  "m_g": "Male Group",
-  nc: "Non-Consent",
-  oral: "Oral",
-  rom: "Romance",
-  rp: "Roleplay",
-  swing: "Swingers",
-  swingers: "Swingers",
-  tor: "Torture",
-  voy: "Voyeurism",
-};
-
-const HEADER_LOOKUP_PROMPT = Object.entries(HEADER_CODE_TAG_LOOKUP)
-  .sort(([left], [right]) => left.localeCompare(right))
-  .map(([code, tag]) => `- ${code} -> ${tag}`)
-  .join("\n");
-
-function normalizeCode(value: string): string {
-  return value.trim().replace(/\s+/g, "").toLowerCase();
-}
-
-function dedupeCaseInsensitive(values: string[], maxItems: number): string[] {
-  const seen = new Set<string>();
-  const output: string[] = [];
-  for (const value of values) {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const key = trimmed.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    output.push(trimmed);
-    if (output.length >= maxItems) {
-      break;
-    }
-  }
-  return output;
-}
-
-function mappedTagsFromHeaderCodes(headerTagCodes: string[]): string[] {
-  const tags: string[] = [];
-  for (const code of headerTagCodes) {
-    const mapped = HEADER_CODE_TAG_LOOKUP[normalizeCode(code)];
-    if (mapped) {
-      tags.push(mapped);
-    }
-  }
-  return dedupeCaseInsensitive(tags, 12);
-}
-
-function ensureRequiredTags(tags: string[], requiredTags: string[]): string[] {
-  const required = dedupeCaseInsensitive(requiredTags, 12);
-  const existing = dedupeCaseInsensitive(tags, 12).filter(
-    (tag) => !required.some((requiredTag) => requiredTag.toLowerCase() === tag.toLowerCase()),
-  );
-  return dedupeCaseInsensitive([...required, ...existing], 12);
-}
-
-function missingRequiredTags(tags: string[], requiredTags: string[]): string[] {
-  const present = new Set(tags.map((tag) => tag.toLowerCase()));
-  return requiredTags.filter((required) => !present.has(required.toLowerCase()));
-}
-
-function buildBodyPrompt(bodyText: string) {
-  const maxSection = 7000;
-  if (bodyText.length <= maxSection * 2) {
-    return bodyText;
+function buildMetadataPrompt(storyText: string) {
+  const maxSection = 8000;
+  if (storyText.length <= maxSection * 2) {
+    return storyText;
   }
 
-  const middleStart = Math.max(0, Math.floor(bodyText.length / 2) - Math.floor(maxSection / 2));
-  const middleEnd = Math.min(bodyText.length, middleStart + maxSection);
+  const middleStart = Math.max(0, Math.floor(storyText.length / 2) - Math.floor(maxSection / 2));
+  const middleEnd = Math.min(storyText.length, middleStart + maxSection);
 
   return [
     "[BEGINNING]",
-    bodyText.slice(0, maxSection),
+    storyText.slice(0, maxSection),
     "[MIDDLE]",
-    bodyText.slice(middleStart, middleEnd),
+    storyText.slice(middleStart, middleEnd),
     "[END]",
-    bodyText.slice(-maxSection),
+    storyText.slice(-maxSection),
   ].join("\n\n");
 }
 
@@ -165,6 +68,29 @@ function extractJson(raw: string): string {
   }
 
   return trimmed;
+}
+
+function dedupeCaseInsensitive(values: string[], maxItems: number): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(trimmed);
+    if (output.length >= maxItems) {
+      break;
+    }
+  }
+
+  return output;
 }
 
 function asArray(value: unknown, limit: number): string[] {
@@ -192,12 +118,12 @@ function normalizeMetadata(input: unknown): StoryMetadata {
     author: authorRaw ? authorRaw.slice(0, 160) : null,
     summary_short: summaryShortRaw.slice(0, 280),
     summary_long: summaryLongRaw || summaryShortRaw,
-    genre: typeof value.genre === "string" ? value.genre.trim().slice(0, 64) : "Unknown",
-    tone: typeof value.tone === "string" ? value.tone.trim().slice(0, 64) : "Unknown",
-    setting: typeof value.setting === "string" ? value.setting.trim().slice(0, 160) : "",
-    themes: asArray(value.themes, 5),
-    tags: asArray(value.tags, 12),
-    content_notes: asArray(value.content_notes, 8),
+    genre: "Unknown",
+    tone: "Unknown",
+    setting: "",
+    themes: asArray(value.themes, 8),
+    tags: asArray(value.tags, 16).slice(0, 12),
+    content_notes: [],
   };
 }
 
@@ -257,10 +183,7 @@ async function callChatCompletion(
   let attempt = 0;
   while (attempt <= maxRetries) {
     try {
-      return await request({
-        type: "json_schema",
-        json_schema: STORY_METADATA_JSON_SCHEMA,
-      });
+      return await request({ type: "json_schema", json_schema: STORY_METADATA_JSON_SCHEMA });
     } catch (error) {
       if (error instanceof LmStudioRequestError && error.status === 400) {
         try {
@@ -283,10 +206,7 @@ async function callChatCompletion(
   throw new Error("LM Studio chat request retries exhausted");
 }
 
-async function parseMetadataWithRepair(
-  config: IndexerConfig,
-  raw: string,
-): Promise<StoryMetadata> {
+async function parseMetadataWithRepair(config: IndexerConfig, raw: string): Promise<StoryMetadata> {
   try {
     return normalizeMetadata(JSON.parse(extractJson(raw)));
   } catch {
@@ -302,52 +222,35 @@ async function parseMetadataWithRepair(
         { role: "user", content: repairPrompt },
       ],
     );
+
     return normalizeMetadata(JSON.parse(extractJson(repaired)));
   }
 }
 
 export async function extractStoryMetadata(
   config: IndexerConfig,
-  input: MetadataInput,
+  storyText: string,
+  sourcePath: string,
 ): Promise<StoryMetadata> {
-  const headerTagCodes = dedupeCaseInsensitive(input.headerTagCodes, 20);
-  const mappedHeaderTags = mappedTagsFromHeaderCodes(headerTagCodes);
-  const bodyForModel = buildBodyPrompt(input.bodyText.trim() || input.bodyText);
-  const headerForModel = input.headerText.trim();
+  const textForModel = buildMetadataPrompt(storyText);
 
-  const systemPrompt = `You are a story cataloging assistant. Return STRICT JSON only with this schema:
+  const systemPrompt = `You are a story cataloging assistant.
+Return STRICT JSON only with this schema:
 {
   "title": "string",
   "author": "string | null (null if unknown)",
   "summary_short": "<=280 chars",
   "summary_long": "3-6 sentences",
-  "genre": "single best genre",
-  "tone": "single best tone",
-  "setting": "short setting",
-  "themes": ["up to 5 strings"],
-  "tags": ["up to 12 strings, consistent casing"],
-  "content_notes": ["optional strings"]
+  "themes": ["up to 8 strings"],
+  "tags": ["up to 12 strings"]
 }
-Known header code -> tag mapping (authoritative for known codes):
-${HEADER_LOOKUP_PROMPT}
-When HEADER_TAG_CODES includes known codes, tags MUST include their mapped tags.
+Use only what you see in the story text. Do not infer from external sources.
 Do not include markdown or extra keys.`;
 
-  const userPrompt = `Source path: ${input.sourcePath}
+  const userPrompt = `Source path: ${sourcePath}
+Analyze the story text below and return only JSON.
 
-HEADER_TAG_CODES:
-${JSON.stringify(headerTagCodes)}
-
-HEADER:
-<<<
-${headerForModel}
->>>
-
-BODY:
-<<<
-${bodyForModel}
->>>
-`;
+${textForModel}`;
 
   const raw = await callChatCompletion(
     config.lmStudioBaseUrl,
@@ -361,52 +264,5 @@ ${bodyForModel}
     ],
   );
 
-  let metadata = await parseMetadataWithRepair(config, raw);
-
-  if (headerTagCodes.length > 0) {
-    const missing = missingRequiredTags(metadata.tags, mappedHeaderTags);
-    const tagsEmpty = metadata.tags.length === 0;
-
-    if (tagsEmpty || missing.length > 0) {
-      const enforcePrompt = `You omitted required header-code-mapped tags.
-Return corrected JSON only.
-
-HEADER_TAG_CODES:
-${JSON.stringify(headerTagCodes)}
-
-KNOWN_MAPPED_TAGS_REQUIRED:
-${JSON.stringify(mappedHeaderTags)}
-
-MISSING_REQUIRED_TAGS:
-${JSON.stringify(missing)}
-
-PREVIOUS_JSON:
-${extractJson(raw)}
-`;
-
-      const repaired = await callChatCompletion(
-        config.lmStudioBaseUrl,
-        config.lmStudioApiKey,
-        config.lmStudioMetadataModel,
-        config.lmStudioTimeoutMs,
-        config.lmStudioMaxRetries,
-        [
-          { role: "system", content: "Return valid JSON only. No prose. Include required mapped tags." },
-          { role: "user", content: enforcePrompt },
-        ],
-      );
-
-      metadata = await parseMetadataWithRepair(config, repaired);
-    }
-
-    if (mappedHeaderTags.length > 0) {
-      metadata.tags = ensureRequiredTags(metadata.tags, mappedHeaderTags);
-    }
-
-    if (metadata.tags.length === 0) {
-      metadata.tags = dedupeCaseInsensitive(headerTagCodes, 12);
-    }
-  }
-
-  return metadata;
+  return parseMetadataWithRepair(config, raw);
 }

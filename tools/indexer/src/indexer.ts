@@ -101,7 +101,6 @@ function fallbackMetadata(
   relativePath: string,
   status: StoryStatus,
   statusNotes: string | null,
-  headerTagCodes: string[],
 ): StoryMetadata {
   const filename = path.basename(relativePath, path.extname(relativePath));
   const title = filename.replace(/[_-]+/g, " ").trim() || "Untitled Story";
@@ -115,7 +114,7 @@ function fallbackMetadata(
     tone: "Unknown",
     setting: "",
     themes: [],
-    tags: headerTagCodes,
+    tags: [],
     content_notes: statusNotes ? [statusNotes] : [],
   };
 }
@@ -397,37 +396,20 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       }
 
       const shouldRunAi = ingest.status === "OK";
-      let metadata = fallbackMetadata(
-        ingest.sourcePath,
-        ingest.status,
-        ingest.statusNotes,
-        ingest.headerTagCodes,
-      );
+      let metadata = fallbackMetadata(ingest.sourcePath, ingest.status, ingest.statusNotes);
       let metadataFailureNote: string | null = null;
       if (shouldRunAi) {
         try {
-          metadata = await extractStoryMetadata(config, {
-            sourcePath: ingest.sourcePath,
-            headerTagCodes: ingest.headerTagCodes,
-            headerText: ingest.headerText,
-            bodyText: ingest.bodyText,
-          });
+          metadata = await extractStoryMetadata(config, ingest.normalizedText, ingest.sourcePath);
         } catch (metadataError) {
           const message = metadataError instanceof Error ? metadataError.message : "unknown metadata error";
           metadataFailureNote = `Metadata extraction fallback used: ${message}`;
-          metadata = fallbackMetadata(
-            ingest.sourcePath,
-            ingest.status,
-            metadataFailureNote,
-            ingest.headerTagCodes,
-          );
+          metadata = fallbackMetadata(ingest.sourcePath, ingest.status, metadataFailureNote);
           console.warn(`! metadata fallback: ${ingest.sourcePath} (${message})`);
         }
       }
 
-      const chunkSourceText = ingest.bodyText.trim() ? ingest.bodyText : ingest.normalizedText;
-      const chunkSourceOffset = chunkSourceText === ingest.bodyText ? ingest.bodyStartChar : 0;
-      const chunks = chunkText(chunkSourceText, {
+      const chunks = chunkText(ingest.normalizedText, {
         chunkSizeChars: config.chunkSizeChars,
         overlapChars: config.chunkOverlapChars,
       });
@@ -440,8 +422,8 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         chunksKey,
         chunks.map((chunk) => ({
           chunkIndex: chunk.chunkIndex,
-          startChar: chunk.startChar + chunkSourceOffset,
-          endChar: chunk.endChar + chunkSourceOffset,
+          startChar: chunk.startChar,
+          endChar: chunk.endChar,
           excerpt: chunk.excerpt,
         })),
       );
@@ -452,7 +434,6 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         contentHash: ingest.canonHash,
         rawHash: ingest.rawHash,
         canonHash: ingest.canonHash,
-        headerTagCodes: ingest.headerTagCodes,
         storyStatus: ingest.status,
         sourceCount: 1,
         canonTextSource: ingest.sourceType,

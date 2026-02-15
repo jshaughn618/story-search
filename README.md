@@ -47,13 +47,10 @@ For each file:
 4. Compute:
    - `RAW_HASH = sha256(original bytes)`
    - `CANON_HASH = sha256(normalized canonical text)`
-5. Deterministic header-tag extraction (indexer-side, not LLM-side):
-   - scans header lines for a trailing parenthesized tag-code list
-   - stores `HEADER_TAG_CODES_JSON` in D1
-6. Dedupe by `CANON_HASH`
-7. If new canonical story:
-   - metadata via LM Studio (strict JSON)
-   - chunk + Workers AI embeddings (**BODY-only chunks**)
+5. Dedupe by `CANON_HASH`
+6. If new canonical story:
+   - metadata via LM Studio (title, author, summaries, themes, tags from text)
+   - chunk + Workers AI embeddings
    - upload canonical text + chunk map to R2
    - upsert metadata/status to D1
    - upsert vectors to Vectorize (batched and byte-limited <100MB)
@@ -78,7 +75,6 @@ Migrations:
 - `db/migrations/0003_settings.sql`
 - `db/migrations/0004_add_author.sql`
 - `db/migrations/0005_chunk_count_hardening.sql`
-- `db/migrations/0006_header_tag_codes.sql`
 
 `STORIES` includes:
 - `RAW_HASH`
@@ -89,7 +85,6 @@ Migrations:
 - `STATUS_NOTES`
 - `SOURCE_COUNT`
 - `CHUNK_COUNT`
-- `HEADER_TAG_CODES_JSON`
 
 `STORY_SOURCES` includes:
 - `STORY_ID`
