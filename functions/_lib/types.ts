@@ -29,6 +29,7 @@ export interface SearchRequestBody {
   filters?: SearchFilters;
   limit?: number;
   offset?: number;
+  cursor?: string | null;
 }
 
 export interface StoryRow {

@@ -15,9 +15,8 @@ const MAX_LIMIT = 50;
 const DEFAULT_STATUSES: StoryStatus[] = [];
 const VECTOR_MAX_TOPK_WITH_ALL_METADATA = 50;
 const VECTOR_MAX_TOPK_WITH_INDEXED_METADATA = 100;
-const EXACT_SCAN_BATCH_SIZE = 80;
-const EXACT_SCAN_MAX_CANDIDATES = 5000;
-const EXACT_SCAN_CONCURRENCY = 12;
+const EXACT_SCAN_BATCH_SIZE = 40;
+const EXACT_SCAN_MAX_CANDIDATES = 60;
 
 interface VectorMatch {
   id: string;
@@ -32,12 +31,6 @@ interface AggregatedResult {
   excerpt: string;
 }
 
-interface ChunkMapItem {
-  chunkIndex: number;
-  startChar: number;
-  endChar: number;
-  excerpt: string;
-}
 
 function collectVectorMatches(bestByStory: Map<string, AggregatedResult>, matches: VectorMatch[]) {
   for (const match of matches) {
@@ -102,7 +95,12 @@ function clampLimit(limit?: number): number {
   return Math.max(1, Math.min(MAX_LIMIT, Math.trunc(limit)));
 }
 
-function parseExactQuotedQuery(q: string): string | null {
+interface ExactQuery {
+  exactTerm: string;
+  extraTerms: string[];
+}
+
+function parseExactQuery(q: string): ExactQuery | null {
   const trimmed = q.trim();
   if (trimmed.length < 2) {
     return null;
@@ -116,7 +114,17 @@ function parseExactQuotedQuery(q: string): string | null {
   for (const [open, close] of quotePairs) {
     if (trimmed.startsWith(open) && trimmed.endsWith(close)) {
       const inner = trimmed.slice(open.length, trimmed.length - close.length);
-      return inner.length > 0 ? inner : null;
+      return inner.length > 0 ? { exactTerm: inner, extraTerms: [] } : null;
+    }
+
+    if (trimmed.startsWith(open)) {
+      const closeIndex = trimmed.indexOf(close, open.length);
+      if (closeIndex > open.length) {
+        const exactTerm = trimmed.slice(open.length, closeIndex).trim();
+        const tail = trimmed.slice(closeIndex + close.length).trim();
+        const extraTerms = tail.length > 0 ? tail.split(/\s+/).filter(Boolean) : [];
+        return exactTerm ? { exactTerm, extraTerms } : null;
+      }
     }
   }
 
@@ -131,31 +139,6 @@ function buildSnippet(text: string, startIndex: number, matchLength: number): st
     .slice(from, to)
     .replace(/\s+/g, " ")
     .trim();
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<R>,
-): Promise<R[]> {
-  if (items.length === 0) {
-    return [];
-  }
-
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor;
-      cursor += 1;
-      results[index] = await mapper(items[index]);
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
-  await Promise.all(workers);
-  return results;
 }
 
 function normalizeOffset(offset?: number): number {
@@ -292,11 +275,13 @@ function applyFilterClauses(
 
 async function runExactQuery(
   env: Env,
-  exactTerm: string,
+  parsedExact: ExactQuery,
   filters: Required<SearchFilters>,
   limit: number,
-  offset: number,
+  cursor: string | null | undefined,
 ) {
+  const exactTerm = parsedExact.exactTerm;
+  const extraTerms = parsedExact.extraTerms.map((term) => term.toLowerCase());
   const clauses: string[] = [];
   const params: (string | number)[] = [];
   applyFilterClauses(filters, clauses, params);
@@ -312,15 +297,14 @@ async function runExactQuery(
     LIMIT ? OFFSET ?
   `;
 
-  const needed = offset + limit;
+  let dbOffset = Math.max(0, Number.parseInt(cursor ?? "0", 10) || 0);
   const matches: Array<ReturnType<typeof mapStory> & {
     bestChunk: { chunkIndex: number; score: number; excerpt: string } | null;
   }> = [];
   let scanned = 0;
-  let dbOffset = 0;
-  let done = false;
+  let hasMoreRows = true;
 
-  while (!done && matches.length < needed && scanned < EXACT_SCAN_MAX_CANDIDATES) {
+  while (matches.length < limit && scanned < EXACT_SCAN_MAX_CANDIDATES && hasMoreRows) {
     const batchResult = await env.STORY_DB.prepare(sql)
       .bind(...params, EXACT_SCAN_BATCH_SIZE, dbOffset)
       .all<StoryRow>();
@@ -330,70 +314,63 @@ async function runExactQuery(
       break;
     }
 
-    dbOffset += rows.length;
-    scanned += rows.length;
-
-    const rowMatches = await mapWithConcurrency(rows, EXACT_SCAN_CONCURRENCY, async (row) => {
+    for (const row of rows) {
+      dbOffset += 1;
+      scanned += 1;
       const textObject = await env.STORY_BUCKET.get(row.R2_KEY);
       if (!textObject) {
-        return null;
+        if (scanned >= EXACT_SCAN_MAX_CANDIDATES) {
+          break;
+        }
+        continue;
       }
 
       const text = await textObject.text();
       const startIndex = text.indexOf(exactTerm);
       if (startIndex < 0) {
-        return null;
+        if (scanned >= EXACT_SCAN_MAX_CANDIDATES) {
+          break;
+        }
+        continue;
       }
 
-      let chunkIndex = 0;
-      let excerpt = buildSnippet(text, startIndex, exactTerm.length);
-
-      if (row.CHUNKS_KEY) {
-        const chunksObject = await env.STORY_BUCKET.get(row.CHUNKS_KEY);
-        if (chunksObject) {
-          try {
-            const chunks = await chunksObject.json<ChunkMapItem[]>();
-            if (Array.isArray(chunks)) {
-              const matchedChunk = chunks.find(
-                (chunk) => startIndex >= chunk.startChar && startIndex < chunk.endChar,
-              );
-              if (matchedChunk) {
-                chunkIndex = matchedChunk.chunkIndex;
-              }
-            }
-          } catch {
-            // ignore invalid chunk map and use fallback snippet
+      if (extraTerms.length > 0) {
+        const lowerText = text.toLowerCase();
+        const allExtrasPresent = extraTerms.every((term) => lowerText.includes(term));
+        if (!allExtrasPresent) {
+          if (scanned >= EXACT_SCAN_MAX_CANDIDATES) {
+            break;
           }
+          continue;
         }
       }
 
-      return {
+      matches.push({
         ...mapStory(row),
         bestChunk: {
-          chunkIndex,
+          chunkIndex: 0,
           score: 1,
-          excerpt,
+          excerpt: buildSnippet(text, startIndex, exactTerm.length),
         },
-      };
-    });
+      });
 
-    for (const match of rowMatches) {
-      if (match) {
-        matches.push(match);
-      }
-      if (matches.length >= needed) {
-        done = true;
+      if (matches.length >= limit || scanned >= EXACT_SCAN_MAX_CANDIDATES) {
         break;
       }
+    }
+
+    if (rows.length < EXACT_SCAN_BATCH_SIZE) {
+      hasMoreRows = false;
     }
   }
 
   return {
     mode: "exact" as const,
-    items: matches.slice(offset, offset + limit),
-    totalCandidates: matches.length,
+    items: matches,
+    totalCandidates: undefined,
     scannedCandidates: scanned,
-    nextOffset: matches.length > offset + limit ? offset + limit : null,
+    nextOffset: matches.length >= limit ? dbOffset : null,
+    nextCursor: hasMoreRows ? String(dbOffset) : null,
   };
 }
 
@@ -405,15 +382,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const filters = normalizeFilters(body.filters);
     const limit = clampLimit(body.limit);
     const offset = normalizeOffset(body.offset);
-    const exactTerm = parseExactQuotedQuery(q);
+    const exactQuery = parseExactQuery(q);
 
     if (!q) {
       const browseResponse = await runBrowseQuery(env, filters, limit, offset);
       return json(browseResponse);
     }
 
-    if (exactTerm !== null) {
-      const exactResponse = await runExactQuery(env, exactTerm, filters, limit, offset);
+    if (exactQuery !== null) {
+      const exactResponse = await runExactQuery(env, exactQuery, filters, limit, body.cursor);
       return json(exactResponse);
     }
 

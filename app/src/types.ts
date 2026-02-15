@@ -54,6 +54,7 @@ export interface SearchResponse {
   nextOffset: number | null;
   totalCandidates?: number;
   scannedCandidates?: number;
+  nextCursor?: string | null;
 }
 
 export interface SearchRequest {
@@ -66,6 +67,7 @@ export interface SearchRequest {
   };
   limit: number;
   offset: number;
+  cursor?: string | null;
 }
 
 export interface ChunkMapItem {

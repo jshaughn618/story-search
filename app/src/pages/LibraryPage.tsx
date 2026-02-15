@@ -39,6 +39,9 @@ export function LibraryPage() {
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [offset, setOffset] = useState(0);
   const [totalCandidates, setTotalCandidates] = useState<number | undefined>(undefined);
+  const [exactCursor, setExactCursor] = useState<string | null>(null);
+  const [exactNextCursor, setExactNextCursor] = useState<string | null>(null);
+  const [exactCursorHistory, setExactCursorHistory] = useState<string[]>([]);
   const [debugScores, setDebugScores] = useState(false);
   const [openMenuStoryId, setOpenMenuStoryId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoryResult | null>(null);
@@ -52,7 +55,7 @@ export function LibraryPage() {
     return [genre, tone, ...selectedTags].filter(Boolean).length + statusActive;
   }, [genre, tone, selectedTags, statusFilter]);
 
-  const runSearch = async (next = 0) => {
+  const runSearch = async (next = 0, cursor: string | null = null) => {
     setLoading(true);
     setError(null);
 
@@ -67,6 +70,7 @@ export function LibraryPage() {
         },
         limit: PAGE_SIZE,
         offset: next,
+        cursor,
       });
 
       setResults(response.items);
@@ -74,6 +78,14 @@ export function LibraryPage() {
       setOffset(next);
       setNextOffset(response.nextOffset);
       setTotalCandidates(response.totalCandidates);
+      if (response.mode === "exact") {
+        setExactCursor(cursor);
+        setExactNextCursor(response.nextCursor ?? null);
+      } else {
+        setExactCursor(null);
+        setExactNextCursor(null);
+        setExactCursorHistory([]);
+      }
     } catch (searchError) {
       setError(searchError instanceof Error ? searchError.message : "Search failed");
     } finally {
@@ -98,6 +110,9 @@ export function LibraryPage() {
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
+    setExactCursor(null);
+    setExactNextCursor(null);
+    setExactCursorHistory([]);
     void runSearch(0);
   };
 
@@ -308,7 +323,7 @@ export function LibraryPage() {
 
         <div className="results-meta">
           <span>
-            {mode === "semantic" ? "Semantic results" : "Metadata browse"} • page offset {offset}
+            {mode === "semantic" ? "Semantic results" : mode === "exact" ? "Exact text results" : "Metadata browse"} • page offset {offset}
           </span>
           <span>
             {results.length} results {totalCandidates ? `(from ${totalCandidates} ranked matches)` : ""}
@@ -439,15 +454,40 @@ export function LibraryPage() {
       <nav className="pagination-row">
         <button
           type="button"
-          disabled={offset === 0 || loading}
-          onClick={() => void runSearch(Math.max(0, offset - PAGE_SIZE))}
+          disabled={mode === "exact" ? exactCursorHistory.length === 0 || loading : offset === 0 || loading}
+          onClick={() => {
+            if (mode === "exact") {
+              if (exactCursorHistory.length === 0) {
+                return;
+              }
+              const history = [...exactCursorHistory];
+              const previousCursor = history.pop() ?? "";
+              setExactCursorHistory(history);
+              void runSearch(
+                Math.max(0, offset - PAGE_SIZE),
+                previousCursor.length > 0 ? previousCursor : null,
+              );
+              return;
+            }
+            void runSearch(Math.max(0, offset - PAGE_SIZE));
+          }}
         >
           Previous
         </button>
         <button
           type="button"
-          disabled={nextOffset === null || loading}
-          onClick={() => void runSearch(nextOffset ?? offset)}
+          disabled={mode === "exact" ? exactNextCursor === null || loading : nextOffset === null || loading}
+          onClick={() => {
+            if (mode === "exact") {
+              if (!exactNextCursor) {
+                return;
+              }
+              setExactCursorHistory((current) => [...current, exactCursor ?? ""]);
+              void runSearch(offset + PAGE_SIZE, exactNextCursor);
+              return;
+            }
+            void runSearch(nextOffset ?? offset);
+          }}
         >
           Next
         </button>
