@@ -33,7 +33,7 @@ export function LibraryPage() {
   const [genre, setGenre] = useState<string>("");
   const [tone, setTone] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("OK");
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("ALL");
   const [results, setResults] = useState<StoryResult[]>([]);
   const [mode, setMode] = useState<SearchResponse["mode"]>("browse");
   const [nextOffset, setNextOffset] = useState<number | null>(null);
@@ -111,7 +111,7 @@ export function LibraryPage() {
     setGenre("");
     setTone("");
     setSelectedTags([]);
-    setStatusFilter("OK");
+    setStatusFilter("ALL");
   };
 
   useEffect(() => {
@@ -263,8 +263,8 @@ export function LibraryPage() {
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as StatusFilterValue)}
             >
-              <option value="OK">OK only</option>
               <option value="ALL">All statuses</option>
+              <option value="OK">OK only</option>
               {filters.statuses
                 .map((item) => item.status)
                 .filter((status) => status !== "OK")

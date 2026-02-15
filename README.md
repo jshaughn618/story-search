@@ -111,7 +111,7 @@ Indexer compares runtime model/dimension vs `SETTINGS` and aborts on mismatch un
 - `EXTRACTION_FAILED`
 
 Behavior:
-- `TOO_SHORT`, `PDF_SCANNED_IMAGE`, `NEEDS_REVIEW`, `BINARY_GARBAGE`: skip embeddings
+- `EXTRACTION_FAILED`, `PDF_SCANNED_IMAGE`, `BINARY_GARBAGE`: skip embeddings
 - `EXTRACTION_FAILED`: no canonical upload/vectorization, captured in failure report
 - Processing continues for other files
 

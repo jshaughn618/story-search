@@ -12,8 +12,9 @@ import type {
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
-const DEFAULT_STATUSES: StoryStatus[] = ["OK"];
+const DEFAULT_STATUSES: StoryStatus[] = [];
 const VECTOR_MAX_TOPK_WITH_ALL_METADATA = 50;
+const VECTOR_MAX_TOPK_WITH_INDEXED_METADATA = 100;
 
 interface VectorMatch {
   id: string;
@@ -26,6 +27,28 @@ interface AggregatedResult {
   chunkIndex: number;
   score: number;
   excerpt: string;
+}
+
+function collectVectorMatches(bestByStory: Map<string, AggregatedResult>, matches: VectorMatch[]) {
+  for (const match of matches) {
+    const metadata = match.metadata;
+    const storyId = metadata?.storyId ?? match.id.split(":")[0];
+    if (!storyId) {
+      continue;
+    }
+
+    const existing = bestByStory.get(storyId);
+    if (!existing || match.score > existing.score) {
+      bestByStory.set(storyId, {
+        storyId,
+        chunkIndex:
+          metadata?.chunkIndex ??
+          (Number.parseInt(match.id.split(":")[1] ?? "0", 10) || 0),
+        score: match.score,
+        excerpt: metadata?.excerpt ?? existing?.excerpt ?? "",
+      });
+    }
+  }
 }
 
 function normalizeStatuses(statuses?: StoryStatus[]): StoryStatus[] {
@@ -225,35 +248,32 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       vectorFilter.storyStatus = filters.statuses[0];
     }
 
-    const topK = Math.min(
+    const topKWithAllMetadata = Math.min(
       Math.min(Math.max(limit * 5, 40), 120),
       VECTOR_MAX_TOPK_WITH_ALL_METADATA,
     );
     const vectorQuery = await env.STORY_VECTORS.query(queryVector, {
-      topK,
+      topK: topKWithAllMetadata,
       returnMetadata: "all",
       filter: Object.keys(vectorFilter).length > 0 ? vectorFilter : undefined,
     });
 
     const bestByStory = new Map<string, AggregatedResult>();
-    for (const match of (vectorQuery.matches ?? []) as VectorMatch[]) {
-      const metadata = match.metadata;
-      const storyId = metadata?.storyId ?? match.id.split(":")[0];
-      if (!storyId) {
-        continue;
-      }
+    collectVectorMatches(bestByStory, (vectorQuery.matches ?? []) as VectorMatch[]);
 
-      const existing = bestByStory.get(storyId);
-      if (!existing || match.score > existing.score) {
-        bestByStory.set(storyId, {
-          storyId,
-          chunkIndex:
-            metadata?.chunkIndex ??
-            (Number.parseInt(match.id.split(":")[1] ?? "0", 10) || 0),
-          score: match.score,
-          excerpt: metadata?.excerpt ?? "",
-        });
-      }
+    const topKWithIndexedMetadata = Math.min(
+      Math.max(limit * 8, 80),
+      VECTOR_MAX_TOPK_WITH_INDEXED_METADATA,
+    );
+
+    if (topKWithIndexedMetadata > topKWithAllMetadata && bestByStory.size < Math.max(limit, 10)) {
+      const expandedVectorQuery = await env.STORY_VECTORS.query(queryVector, {
+        topK: topKWithIndexedMetadata,
+        returnValues: false,
+        returnMetadata: "indexed",
+        filter: Object.keys(vectorFilter).length > 0 ? vectorFilter : undefined,
+      });
+      collectVectorMatches(bestByStory, (expandedVectorQuery.matches ?? []) as VectorMatch[]);
     }
 
     const ranked = [...bestByStory.values()].sort((a, b) => b.score - a.score);

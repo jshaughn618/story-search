@@ -36,6 +36,10 @@ interface RunSummary {
   };
 }
 
+function shouldGenerateEmbeddings(status: StoryStatus): boolean {
+  return !["EXTRACTION_FAILED", "PDF_SCANNED_IMAGE", "BINARY_GARBAGE"].includes(status);
+}
+
 function sourceTypeFromExtension(extension: string) {
   switch (extension.toLowerCase()) {
     case ".html":
@@ -395,7 +399,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         continue;
       }
 
-      const shouldRunAi = ingest.status === "OK";
+      const shouldRunAi = shouldGenerateEmbeddings(ingest.status);
       let metadata = fallbackMetadata(ingest.sourcePath, ingest.status, ingest.statusNotes);
       let metadataFailureNote: string | null = null;
       if (shouldRunAi) {
