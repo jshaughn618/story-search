@@ -454,6 +454,23 @@ a {
   color: var(--muted);
 }
 
+.reader-tags {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.reader-tags button.tag-pill {
+  cursor: pointer;
+  font: inherit;
+}
+
+.reader-tags button.tag-pill:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .reader-status-badge {
   display: inline-flex;
   align-items: center;
@@ -522,6 +539,52 @@ a {
   line-height: 1.95;
 }
 
+.reader-scroll-rail {
+  position: fixed;
+  right: 0.45rem;
+  top: 1rem;
+  bottom: 1rem;
+  width: 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 134, 136, 0.45);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+}
+
+.reader-bookmark-arrow,
+.reader-bookmark-marker {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 0;
+  cursor: pointer;
+}
+
+.reader-bookmark-arrow {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #0d6f72;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.reader-bookmark-marker {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #1f3538;
+  opacity: 0.85;
+}
+
+.reader-bookmark-marker:hover {
+  opacity: 1;
+  transform: translateX(-50%) scale(1.08);
+}
+
 .theme-light {
   --bg: #f5f2ea;
   --ink: #1f262a;
@@ -558,6 +621,19 @@ a {
   border-color: #4c6265;
 }
 
+.theme-dark .reader-scroll-rail {
+  border-color: rgba(105, 124, 126, 0.7);
+  background: rgba(26, 35, 38, 0.75);
+}
+
+.theme-dark .reader-bookmark-arrow {
+  background: #4ea2a6;
+}
+
+.theme-dark .reader-bookmark-marker {
+  background: #d4efef;
+}
+
 .theme-sepia {
   --bg: #f2e8d8;
   --ink: #352719;
@@ -571,6 +647,19 @@ a {
 .theme-sepia .reader-body {
   background: rgba(255, 249, 238, 0.86);
   border-color: #c6af8e;
+}
+
+.theme-sepia .reader-scroll-rail {
+  border-color: rgba(129, 108, 82, 0.45);
+  background: rgba(255, 247, 232, 0.78);
+}
+
+.theme-sepia .reader-bookmark-arrow {
+  background: #7f5830;
+}
+
+.theme-sepia .reader-bookmark-marker {
+  background: #61452a;
 }
 
 @keyframes fade-in {
@@ -615,5 +704,9 @@ a {
 
   .reader-body {
     padding: 1rem;
+  }
+
+  .reader-scroll-rail {
+    display: none;
   }
 }
