@@ -61,14 +61,8 @@ export function LibraryPage() {
   }, [genre, tone, selectedTags, statusFilter, hideRead]);
 
   const filteredTagOptions = useMemo(() => {
-    const q = tagQuery.trim().toLowerCase();
-    if (!q) {
-      return filters.tags.slice(0, 60);
-    }
-    return filters.tags
-      .filter((tagInfo) => tagInfo.tag.toLowerCase().includes(q))
-      .slice(0, 60);
-  }, [filters.tags, tagQuery]);
+    return filters.tags.slice(0, 60);
+  }, [filters.tags]);
 
   const currentFilterParams = () => ({
     genre: genre || null,
@@ -76,6 +70,7 @@ export function LibraryPage() {
     tags: selectedTags,
     statuses: statusFilter === "ALL" ? [] : [statusFilter],
     hideRead,
+    tagQuery,
   });
 
   const runSearch = async (

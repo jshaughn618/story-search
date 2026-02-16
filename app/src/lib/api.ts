@@ -24,6 +24,7 @@ interface FetchFiltersParams {
   tags?: string[];
   statuses?: string[];
   hideRead?: boolean;
+  tagQuery?: string;
 }
 
 async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
@@ -67,6 +68,9 @@ export function fetchFilters(params?: FetchFiltersParams) {
   }
   if (params?.hideRead) {
     query.set("hideRead", "1");
+  }
+  if (params?.tagQuery && params.tagQuery.trim()) {
+    query.set("tagQuery", params.tagQuery.trim());
   }
 
   const suffix = query.toString();
