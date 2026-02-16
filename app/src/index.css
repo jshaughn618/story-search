@@ -416,6 +416,12 @@ a {
   padding: 0.85rem;
 }
 
+.reader-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
 .reader-controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -437,11 +443,39 @@ a {
   margin: 0;
   font-size: clamp(1.65rem, 3vw, 2.2rem);
   font-family: "Literata", serif;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
 
 .reader-meta p {
   margin-top: 0.4rem;
   color: var(--muted);
+}
+
+.reader-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #b5c0c1;
+  padding: 0.18rem 0.55rem;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #fff;
+}
+
+.reader-status-badge.is-read {
+  background: #d8f1e0;
+  border-color: #76aa87;
+  color: #1c5f32;
+}
+
+.reader-status-badge.is-unread {
+  background: #f3f3f1;
+  border-color: #b8bebc;
+  color: #415152;
 }
 
 .reader-body {

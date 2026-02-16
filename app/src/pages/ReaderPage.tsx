@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ApiError, fetchStory } from "../lib/api";
+import { ApiError, fetchStory, updateStory } from "../lib/api";
 import {
   defaultReaderPreferences,
   loadReaderPreferences,
@@ -29,6 +29,8 @@ export function ReaderPage() {
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [highlightedParagraph, setHighlightedParagraph] = useState<number | null>(null);
+  const [updatingRead, setUpdatingRead] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<ReaderPreferences>(() => {
     if (typeof window === "undefined") {
       return defaultReaderPreferences;
@@ -71,6 +73,18 @@ export function ReaderPage() {
   useEffect(() => {
     saveReaderPreferences(preferences);
   }, [preferences]);
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setToast(null);
+    }, 2400);
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [toast]);
 
   const paragraphs = useMemo<ParagraphBlock[]>(() => {
     if (!data?.text) {
@@ -130,6 +144,58 @@ export function ReaderPage() {
   const updateLineHeight = (lineHeight: ReaderLineHeight) =>
     setPreferences((current) => ({ ...current, lineHeight }));
 
+  const toggleRead = async () => {
+    if (!id || !data || updatingRead) {
+      return;
+    }
+
+    const previous = data.story.isRead;
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            story: {
+              ...current.story,
+              isRead: !previous,
+            },
+          }
+        : current,
+    );
+    setUpdatingRead(true);
+
+    try {
+      const response = await updateStory(id, { isRead: !previous });
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              story: {
+                ...current.story,
+                isRead: response.story.isRead,
+              },
+            }
+          : current,
+      );
+      setToast(response.story.isRead ? "Marked as read." : "Marked as unread.");
+    } catch (updateError) {
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              story: {
+                ...current.story,
+                isRead: previous,
+              },
+            }
+          : current,
+      );
+      const message = updateError instanceof Error ? updateError.message : "Failed to update read state";
+      setToast(`Update failed: ${message}`);
+    } finally {
+      setUpdatingRead(false);
+    }
+  };
+
   const style = {
     "--reader-font-size": `${preferences.fontSize}px`,
   } as CSSProperties;
@@ -166,9 +232,14 @@ export function ReaderPage() {
   return (
     <main className={`reader-page theme-${preferences.theme}`} style={style}>
       <header className="reader-toolbar">
-        <button type="button" onClick={() => (backTo ? navigate(backTo) : navigate(-1))}>
-          Back to results
-        </button>
+        <div className="reader-toolbar-actions">
+          <button type="button" onClick={() => (backTo ? navigate(backTo) : navigate(-1))}>
+            Back to results
+          </button>
+          <button type="button" onClick={toggleRead} disabled={updatingRead}>
+            {updatingRead ? "Updating..." : data.story.isRead ? "Mark unread" : "Mark read"}
+          </button>
+        </div>
 
         <div className="reader-controls">
           <label>
@@ -218,7 +289,12 @@ export function ReaderPage() {
       </header>
 
       <section className="reader-meta">
-        <h1>{data.story.title}</h1>
+        <h1>
+          {data.story.title}
+          <span className={`reader-status-badge ${data.story.isRead ? "is-read" : "is-unread"}`}>
+            {data.story.isRead ? "Read" : "Unread"}
+          </span>
+        </h1>
         <p>{readerMetaParts.join(" • ")}</p>
       </section>
 
@@ -242,6 +318,8 @@ export function ReaderPage() {
           );
         })}
       </article>
+
+      {toast ? <div className="toast">{toast}</div> : null}
     </main>
   );
 }
