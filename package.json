@@ -5,13 +5,15 @@
   "workspaces": [
     "app",
     "tools/indexer",
+    "tools/tagger",
     "shared"
   ],
   "scripts": {
     "dev": "npm run dev -w app",
-    "build": "npm run build -w app && npm run build -w tools/indexer",
+    "build": "npm run build -w app && npm run build -w tools/indexer && npm run build -w tools/tagger",
     "build:app": "npm run build -w app",
     "build:indexer": "npm run build -w tools/indexer",
+    "build:tagger": "npm run build -w tools/tagger",
     "typecheck:functions": "tsc -p functions/tsconfig.json --noEmit"
   },
   "devDependencies": {

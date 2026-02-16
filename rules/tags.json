@@ -1,0 +1,66 @@
+[
+  {
+    "tag": "Zulu Wars",
+    "anyOf": ["zulu", "isandlwana", "rorke's drift"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Space Opera",
+    "anyOf": ["starship", "jump gate", "galactic empire", "orbital station"],
+    "minCount": 2,
+    "caseSensitive": false
+  },
+  {
+    "tag": "Noir",
+    "anyOf": ["private investigator", "femme fatale", "smoke-filled", "hardboiled"],
+    "minCount": 1,
+    "caseSensitive": false
+  },
+  {
+    "tag": "Magic School",
+    "anyOf": ["academy", "headmaster", "spellbook", "wizard class"],
+    "minCount": 2,
+    "caseSensitive": false
+  },
+  {
+    "tag": "Time Travel",
+    "anyOf": ["time machine", "timeline", "paradox", "went back"],
+    "minCount": 1,
+    "caseSensitive": false
+  },
+  {
+    "tag": "WWII",
+    "anyOf": ["wwii", "world war ii", "nazi", "allied forces"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": false
+  },
+  {
+    "tag": "First Person",
+    "anyOf": ["I ", " my ", " me "],
+    "minCount": 5,
+    "caseSensitive": true,
+    "matchWholeWord": false
+  },
+  {
+    "tag": "Detective",
+    "anyOf": ["detective", "investigation", "crime scene", "suspect"],
+    "minCount": 2,
+    "caseSensitive": false
+  },
+  {
+    "tag": "Vampires",
+    "anyOf": ["vampire", "fangs", "bloodlust", "undead"],
+    "minCount": 1,
+    "caseSensitive": false
+  },
+  {
+    "tag": "Sea Adventure",
+    "anyOf": ["ship", "captain", "storm", "harbor", "sail"],
+    "minCount": 3,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  }
+]

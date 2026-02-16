@@ -10,6 +10,7 @@ dist/
 tools/indexer/output_text/
 tools/indexer/output_reports/
 tools/indexer/reports/
+tools/tagger/reports/
 
 # Keep sample fixtures tracked, ignore large corpus files.
 *.txt

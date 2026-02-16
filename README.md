@@ -59,6 +59,50 @@ For each file:
 
 Reader view always renders canonical text from R2.
 
+## Local Tagger (Rule-Based Tags)
+
+The local tagger applies configurable lexical rules to canonical text files and writes one unified tag list back to `STORIES.TAGS_JSON` in D1.
+
+- Rules file: `rules/tags.json`
+- Canonical source dir: `tools/indexer/output_text`
+- Command:
+
+```bash
+npm run start -w tools/tagger -- apply --rules rules/tags.json --source tools/indexer/output_text
+```
+
+Options:
+- `--overwrite`
+- `--dry-run`
+- `--only-story <id>`
+- `--ruleset-version <v>`
+- `--max-files <n>`
+- `--min-wordcount <n>`
+- `--report-out <dir>`
+
+Tagger reports:
+- `tagger_summary.json`
+- `tagged_stories_sample.csv`
+
+Rules format (`rules/tags.json`):
+
+```json
+[
+  {
+    "tag": "Zulu Wars",
+    "anyOf": ["zulu", "isandlwana", "rorke's drift"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  }
+]
+```
+
+Rule behavior:
+- Each rule applies when total matches across `anyOf` terms reach `minCount`.
+- `caseSensitive` defaults to `false`.
+- `matchWholeWord` defaults to `true` for single terms and `false` for phrases.
+
 ## Story Deletion
 
 - Story list/search cards include a `...` menu with `Delete`.
@@ -78,6 +122,7 @@ Migrations:
 - `db/migrations/0004_add_author.sql`
 - `db/migrations/0005_chunk_count_hardening.sql`
 - `db/migrations/0006_user_tags_and_read.sql`
+- `db/migrations/0007_tagger_audit_columns.sql`
 
 `STORIES` includes:
 - `RAW_HASH`
@@ -88,6 +133,8 @@ Migrations:
 - `STATUS_NOTES`
 - `SOURCE_COUNT`
 - `CHUNK_COUNT`
+- `TAG_SOURCES_JSON` (optional tag audit metadata)
+- `TAG_RULESET_VERSION` (optional ruleset label)
 
 `STORY_SOURCES` includes:
 - `STORY_ID`
@@ -165,6 +212,8 @@ cp .env.example .env
 Important env vars:
 - `CF_ACCOUNT_ID`
 - `CF_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID` (alias supported)
+- `CLOUDFLARE_API_TOKEN` (alias supported)
 - `CF_AI_EMBED_MODEL=@cf/baai/bge-base-en-v1.5`
 - `LMSTUDIO_TIMEOUT_MS=120000`
 - `LMSTUDIO_MAX_RETRIES=2`
@@ -187,6 +236,8 @@ npm run start -w tools/indexer -- index ./sample_stories --changed-only --profil
 npm run start -w tools/indexer -- index ./sample_stories --full
 npm run start -w tools/indexer -- index ./sample_stories --full --force-reindex
 npm run start -w tools/indexer -- status
+npm run start -w tools/tagger -- apply --rules rules/tags.json --source tools/indexer/output_text --dry-run
+npm run start -w tools/tagger -- apply --rules rules/tags.json --source tools/indexer/output_text
 ```
 
 Notes:
