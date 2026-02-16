@@ -26,5 +26,61 @@
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
+  },
+  {
+    "tag": "Bondage",
+    "anyOf": ["bondage", "bondage gear", "bondage equipment", "bondage restraints", "bondage rope", "bondage cuffs", "bondage tape", "bondage chains", "bondage harness", "bdsm", "hogtie"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Spanking",
+    "anyOf": ["spanking", "spank", "spanked", "spanks", "paddle", "paddling", "paddled", "paddles"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Rape",
+    "anyOf": ["rape", "raped", "rapes", "raping", "sexual assault", "sexual abuse", "non-consensual", "reluctance"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Schoolgirl",
+    "anyOf": ["schoolgirl", "school uniform", "schoolgirl outfit", "schoolgirl costume", "jumper"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Age Play",
+    "anyOf": ["age play", "ageplay", "age regression", "age regression play", "age regression roleplay", "age regression role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Teen",
+    "anyOf": ["teen", "teens", "teenager", "adolescent", "young adult", "pre-teen", "preteen"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Teen",
+    "anyOf": ["f-teen", "f_teen", "fteen", "f-teens","f_teens", "fteenager", "f-adolescent", "f-young adult", "f-pre-teen", "fpreteen", "F_teens", "F-teen", "F_teen", "Fteen", "F-teens", "F_teens", "Fteenager", "F-adolescent", "F-young adult", "F-pre-teen", "Fpreteen"],
+    "minCount": 1,
+    "caseSensitive": true,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Torture",
+    "anyOf": ["torture", "tortured", "tortures", "torturing", "pain", "painful", "suffering", "torment", "tormented", "torments", "torturous", "whipping", "whipped", "whips", "whipping", "cane", "caning", "caned", "paddle", "paddling", "paddled", "paddles"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
   }
 ]
