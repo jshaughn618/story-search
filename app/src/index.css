@@ -707,6 +707,9 @@ a {
   }
 
   .reader-scroll-rail {
-    display: none;
+    right: 0.25rem;
+    top: 0.75rem;
+    bottom: 0.75rem;
+    width: 24px;
   }
 }

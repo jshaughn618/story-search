@@ -349,8 +349,35 @@ export function ReaderPage() {
       return;
     }
 
-    if (bookmarks.some((bookmark) => bookmark.startChar === paragraph.startChar)) {
-      setToast("Bookmark already exists here.");
+    const existingBookmark = bookmarks.find((bookmark) => bookmark.startChar === paragraph.startChar);
+    if (existingBookmark) {
+      const nextBookmarks = bookmarks.filter((bookmark) => bookmark.id !== existingBookmark.id);
+      setBookmarks(nextBookmarks);
+      saveStoryBookmarks(id, nextBookmarks);
+
+      if (nextBookmarks.length === 0) {
+        try {
+          const response = await updateStory(id, { removeUserTag: "Bookmarked" });
+          setData((current) =>
+            current
+              ? {
+                  ...current,
+                  story: {
+                    ...current.story,
+                    tags: response.story.tags,
+                    userTags: response.story.userTags,
+                  },
+                }
+              : current,
+          );
+        } catch (updateError) {
+          const message = updateError instanceof Error ? updateError.message : "Failed to remove tag";
+          setToast(`Bookmark removed, but tag update failed: ${message}`);
+          return;
+        }
+      }
+
+      setToast("Bookmark removed.");
       return;
     }
 
