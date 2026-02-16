@@ -1,65 +1,29 @@
 [
   {
-    "tag": "Zulu Wars",
-    "anyOf": ["zulu", "isandlwana", "rorke's drift"],
+    "tag": "Watersports",
+    "anyOf": ["pee", "piss", "urine", "watersports", "golden shower"],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Space Opera",
-    "anyOf": ["starship", "jump gate", "galactic empire", "orbital station"],
-    "minCount": 2,
-    "caseSensitive": false
-  },
-  {
-    "tag": "Noir",
-    "anyOf": ["private investigator", "femme fatale", "smoke-filled", "hardboiled"],
-    "minCount": 1,
-    "caseSensitive": false
-  },
-  {
-    "tag": "Magic School",
-    "anyOf": ["academy", "headmaster", "spellbook", "wizard class"],
-    "minCount": 2,
-    "caseSensitive": false
-  },
-  {
-    "tag": "Time Travel",
-    "anyOf": ["time machine", "timeline", "paradox", "went back"],
-    "minCount": 1,
-    "caseSensitive": false
-  },
-  {
-    "tag": "WWII",
-    "anyOf": ["wwii", "world war ii", "nazi", "allied forces"],
+    "tag": "Humiliation",
+    "anyOf": ["humiliation", "humiliate", "degradation", "degrade", "embarrassment", "embarrass", "shame", "shaming", "dehumanization", "dehumanize"],
     "minCount": 1,
     "caseSensitive": false,
-    "matchWholeWord": false
+    "matchWholeWord": true
   },
   {
-    "tag": "First Person",
-    "anyOf": ["I ", " my ", " me "],
-    "minCount": 5,
-    "caseSensitive": true,
-    "matchWholeWord": false
-  },
-  {
-    "tag": "Detective",
-    "anyOf": ["detective", "investigation", "crime scene", "suspect"],
-    "minCount": 2,
-    "caseSensitive": false
-  },
-  {
-    "tag": "Vampires",
-    "anyOf": ["vampire", "fangs", "bloodlust", "undead"],
+    "tag": "Femdom",
+    "anyOf": ["femdom", "female dominance", "f_dom", "f-dom", "fdom", "female domination", "dominatrix", "female dom", "goddess", "mistress", "lezdom", "femdomme"],
     "minCount": 1,
-    "caseSensitive": false
+    "caseSensitive": false,
+    "matchWholeWord": true
   },
   {
-    "tag": "Sea Adventure",
-    "anyOf": ["ship", "captain", "storm", "harbor", "sail"],
-    "minCount": 3,
+    "tag": "Pantyhose",
+    "anyOf": ["pantyhose", "tights", "stockings", "hosiery", "nylons", "panty hose", "panty-hose", "garter"],
+    "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   }

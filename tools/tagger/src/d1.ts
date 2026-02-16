@@ -14,6 +14,8 @@ interface ColumnInfoRow {
   name: string;
 }
 
+const D1_SAFE_SQL_VARIABLE_LIMIT = 90;
+
 export interface D1ClientConfig {
   accountId: string;
   apiToken: string;
@@ -82,7 +84,7 @@ export class D1Client {
       return byId;
     }
 
-    const chunks = chunkArray([...new Set(storyIds)], 300);
+    const chunks = chunkArray([...new Set(storyIds)], D1_SAFE_SQL_VARIABLE_LIMIT);
     for (const ids of chunks) {
       const placeholders = ids.map(() => "?").join(",");
       const optionalColumns = [
@@ -119,7 +121,12 @@ export class D1Client {
       return;
     }
 
-    const chunks = chunkArray(updates, 120);
+    const varsPerRow =
+      3 + // TAGS case + WHERE id
+      (capabilities.hasTagSourcesJson ? 2 : 0) +
+      (capabilities.hasTagRulesetVersion ? 2 : 0);
+    const rowsPerChunk = Math.max(1, Math.floor(D1_SAFE_SQL_VARIABLE_LIMIT / varsPerRow));
+    const chunks = chunkArray(updates, rowsPerChunk);
 
     for (const chunk of chunks) {
       const tagsCase = chunk.map(() => "WHEN ? THEN ?").join(" ");

@@ -271,21 +271,24 @@ function applyFilterClauses(
   }
 
   if (filters.tags.length > 0) {
-    const tagPlaceholders = filters.tags.map(() => "?").join(",");
+    const normalizedTags = filters.tags.map((tag) => tag.toLowerCase());
+    const tagPlaceholders = normalizedTags.map(() => "?").join(",");
     clauses.push(`
       STORY_ID IN (
         SELECT STORY_ID
         FROM (
-          SELECT STORY_ID, TAG FROM STORY_TAGS
+          SELECT s.STORY_ID AS STORY_ID, LOWER(TRIM(j.value)) AS TAG
+          FROM STORIES s, json_each(COALESCE(s.TAGS_JSON, '[]')) j
+          WHERE j.type = 'text' AND TRIM(j.value) != ''
           UNION
-          SELECT STORY_ID, TAG FROM STORY_USER_TAGS
+          SELECT STORY_ID, LOWER(TAG) AS TAG FROM STORY_USER_TAGS
         )
         WHERE TAG IN (${tagPlaceholders})
         GROUP BY STORY_ID
         HAVING COUNT(DISTINCT TAG) = ?
       )
     `);
-    params.push(...filters.tags, filters.tags.length);
+    params.push(...normalizedTags, normalizedTags.length);
   }
 
   if (filters.hideRead) {

@@ -30,7 +30,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
     env.STORY_DB.prepare(
       `SELECT TAG AS tag, COUNT(DISTINCT STORY_ID) AS count
        FROM (
-         SELECT STORY_ID, TAG FROM STORY_TAGS
+         SELECT s.STORY_ID AS STORY_ID, TRIM(j.value) AS TAG
+         FROM STORIES s, json_each(COALESCE(s.TAGS_JSON, '[]')) j
+         WHERE j.type = 'text' AND TRIM(j.value) != ''
          UNION
          SELECT STORY_ID, TAG FROM STORY_USER_TAGS
        )
