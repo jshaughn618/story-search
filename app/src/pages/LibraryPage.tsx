@@ -70,6 +70,14 @@ export function LibraryPage() {
       .slice(0, 60);
   }, [filters.tags, tagQuery]);
 
+  const currentFilterParams = () => ({
+    genre: genre || null,
+    tone: tone || null,
+    tags: selectedTags,
+    statuses: statusFilter === "ALL" ? [] : [statusFilter],
+    hideRead,
+  });
+
   const runSearch = async (
     next = 0,
     cursor: string | null = null,
@@ -150,7 +158,7 @@ export function LibraryPage() {
   useEffect(() => {
     const init = async () => {
       try {
-        const response = await fetchFilters();
+        const response = await fetchFilters(currentFilterParams());
         setFilters(response);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load filters");
@@ -190,12 +198,17 @@ export function LibraryPage() {
 
   const refreshFilters = async () => {
     try {
-      const response = await fetchFilters();
+      const response = await fetchFilters(currentFilterParams());
       setFilters(response);
     } catch {
       // noop
     }
   };
+
+  useEffect(() => {
+    void refreshFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genre, tone, statusFilter, hideRead, selectedTags.join("|")]);
 
   useEffect(() => {
     if (!toast) {

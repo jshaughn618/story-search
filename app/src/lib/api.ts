@@ -18,6 +18,14 @@ export class ApiError extends Error {
   }
 }
 
+interface FetchFiltersParams {
+  genre?: string | null;
+  tone?: string | null;
+  tags?: string[];
+  statuses?: string[];
+  hideRead?: boolean;
+}
+
 async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
@@ -43,8 +51,27 @@ async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function fetchFilters() {
-  return apiRequest<FiltersResponse>("/api/filters");
+export function fetchFilters(params?: FetchFiltersParams) {
+  const query = new URLSearchParams();
+  if (params?.genre) {
+    query.set("genre", params.genre);
+  }
+  if (params?.tone) {
+    query.set("tone", params.tone);
+  }
+  if (params?.tags && params.tags.length > 0) {
+    query.set("tags", params.tags.join(","));
+  }
+  if (params?.statuses && params.statuses.length > 0) {
+    query.set("statuses", params.statuses.join(","));
+  }
+  if (params?.hideRead) {
+    query.set("hideRead", "1");
+  }
+
+  const suffix = query.toString();
+  const path = suffix ? `/api/filters?${suffix}` : "/api/filters";
+  return apiRequest<FiltersResponse>(path);
 }
 
 export function searchStories(body: SearchRequest) {
