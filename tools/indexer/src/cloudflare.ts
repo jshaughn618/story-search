@@ -31,6 +31,9 @@ interface DuplicateGroupQueryRow {
   SAMPLE_SOURCE_PATHS: string;
 }
 
+const CF_REQUEST_MAX_RETRIES = 4;
+const CF_REQUEST_TIMEOUT_MS = 30_000;
+
 export class CloudflareClient {
   private readonly s3: S3Client;
 
@@ -47,26 +50,66 @@ export class CloudflareClient {
   }
 
   private async cfRequest<T>(path: string, init: RequestInit): Promise<T> {
-    const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
-      ...init,
-      headers: {
-        authorization: `Bearer ${this.config.cloudflareApiToken}`,
-        ...(init.body instanceof FormData ? {} : { "content-type": "application/json" }),
-        ...(init.headers ?? {}),
-      },
-    });
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    const payload = (await response.json()) as CloudflareApiEnvelope<T>;
-    if (!response.ok || !payload.success) {
-      const details = payload.errors?.map((error) => error.message).filter(Boolean).join("; ");
-      throw new Error(`Cloudflare API error (${response.status}): ${details || "unknown error"}`);
+    const isRetryableFetchError = (error: unknown): boolean => {
+      if (!(error instanceof Error)) {
+        return false;
+      }
+      const cause = error as Error & { cause?: { code?: string } };
+      const code = cause.cause?.code ?? "";
+      return (
+        code === "ECONNRESET" ||
+        code === "UND_ERR_CONNECT_TIMEOUT" ||
+        code === "UND_ERR_HEADERS_TIMEOUT" ||
+        error.message.toLowerCase().includes("fetch failed")
+      );
+    };
+
+    let attempt = 0;
+    while (attempt <= CF_REQUEST_MAX_RETRIES) {
+      try {
+        const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
+          ...init,
+          signal: AbortSignal.timeout(CF_REQUEST_TIMEOUT_MS),
+          headers: {
+            authorization: `Bearer ${this.config.cloudflareApiToken}`,
+            ...(init.body instanceof FormData ? {} : { "content-type": "application/json" }),
+            ...(init.headers ?? {}),
+          },
+        });
+
+        const payload = (await response.json()) as CloudflareApiEnvelope<T>;
+        if (!response.ok || !payload.success) {
+          const details = payload.errors?.map((error) => error.message).filter(Boolean).join("; ");
+          const message = `Cloudflare API error (${response.status}): ${details || "unknown error"}`;
+          const retryableStatus =
+            response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500;
+          if (retryableStatus && attempt < CF_REQUEST_MAX_RETRIES) {
+            const backoffMs = Math.min(500 * 2 ** attempt, 4000);
+            await sleep(backoffMs);
+            attempt += 1;
+            continue;
+          }
+          throw new Error(message);
+        }
+
+        if (payload.result === undefined) {
+          throw new Error("Cloudflare API response missing result");
+        }
+
+        return payload.result;
+      } catch (error) {
+        if (attempt >= CF_REQUEST_MAX_RETRIES || !isRetryableFetchError(error)) {
+          throw error;
+        }
+        const backoffMs = Math.min(500 * 2 ** attempt, 4000);
+        await sleep(backoffMs);
+        attempt += 1;
+      }
     }
 
-    if (payload.result === undefined) {
-      throw new Error("Cloudflare API response missing result");
-    }
-
-    return payload.result;
+    throw new Error("Cloudflare API request retries exhausted");
   }
 
   async d1Query<T>(sql: string, params: Array<string | number | null> = []): Promise<T[]> {
