@@ -16,6 +16,9 @@ tools/tagger/reports/
 *.txt
 !sample_stories/*.txt
 !tools/indexer/prompts/system_prompt.txt
+*.doc
+*.pdf
+*.rtf
 
 ingest_summary.json
 *.csv

@@ -61,8 +61,11 @@ export function LibraryPage() {
   }, [genre, tone, selectedTags, statusFilter, hideRead]);
 
   const filteredTagOptions = useMemo(() => {
+    if (tagQuery.trim()) {
+      return filters.tags;
+    }
     return filters.tags.slice(0, 60);
-  }, [filters.tags]);
+  }, [filters.tags, tagQuery]);
 
   const currentFilterParams = () => ({
     genre: genre || null,
@@ -203,7 +206,7 @@ export function LibraryPage() {
   useEffect(() => {
     void refreshFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genre, tone, statusFilter, hideRead, selectedTags.join("|")]);
+  }, [genre, tone, statusFilter, hideRead, selectedTags.join("|"), tagQuery]);
 
   useEffect(() => {
     if (!toast) {
