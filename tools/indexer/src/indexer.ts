@@ -22,6 +22,7 @@ interface RunOptions {
   changedOnly: boolean;
   forceReindex: boolean;
   reprocessExisting: boolean;
+  metadataFallbackOnly: boolean;
   profile: boolean;
 }
 
@@ -335,10 +336,29 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
   const profile = createProfile(options.profile);
   const runStartedAt = performance.now();
   const absoluteFolder = path.resolve(folder);
-  const files = await withTiming(profile, "collect_files_ms", () =>
+  const discoveredFiles = await withTiming(profile, "collect_files_ms", () =>
     collectFiles(absoluteFolder, config.acceptExtensions),
   );
   const client = new CloudflareClient(config);
+  let files = discoveredFiles;
+
+  if (options.metadataFallbackOnly) {
+    const fallbackPaths = await withTiming(profile, "d1_read_targeted_sources_ms", () =>
+      client.getSourcePathsForMetadataFallbackStories(),
+    );
+    const targetSet = new Set(fallbackPaths);
+    const targetBasenames = new Set(fallbackPaths.map((value) => path.basename(value)));
+    files = discoveredFiles.filter((filePath) => {
+      const relativePath = normalizePathForDb(absoluteFolder, filePath);
+      return targetSet.has(relativePath) || targetBasenames.has(path.basename(relativePath));
+    });
+    if (files.length === 0 && fallbackPaths.length > 0) {
+      console.warn(
+        `! metadata-fallback-only matched 0 local files. Folder may differ from original ingest base. D1 targets: ${fallbackPaths.length}`,
+      );
+    }
+    console.log(`- metadata-fallback-only: ${files.length}/${discoveredFiles.length} source files selected`);
+  }
 
   const summary: RunSummary = {
     scanned: files.length,

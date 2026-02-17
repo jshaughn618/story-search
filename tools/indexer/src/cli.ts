@@ -95,17 +95,24 @@ program
   .argument("<folder>", "Folder containing .txt/.html/.rtf/.doc/.docx/.pdf stories")
   .option("--changed-only", "Skip files when source path + RAW_HASH are unchanged", true)
   .option("--full", "Reprocess existing canonical stories (metadata/chunks/embeddings)", false)
+  .option(
+    "--metadata-fallback-only",
+    "Reprocess only sources whose story STATUS_NOTES indicate metadata fallback was previously used",
+    false,
+  )
   .option("--force-reindex", "Override embedding model/dimension settings mismatch checks", false)
   .option("--profile", "Print timing profile in the run summary", false)
   .description("Index files in a folder (incremental by default)")
-  .action(async (folder: string, options: { changedOnly?: boolean; full?: boolean; forceReindex?: boolean; profile?: boolean }) => {
+  .action(async (folder: string, options: { changedOnly?: boolean; full?: boolean; metadataFallbackOnly?: boolean; forceReindex?: boolean; profile?: boolean }) => {
     const config = loadConfig();
     const inputFolder = resolveInputFolder(folder, loadedEnvPath);
     const full = options.full === true;
+    const metadataFallbackOnly = options.metadataFallbackOnly === true;
     const summary = await runIndexing(config, inputFolder, {
-      changedOnly: full ? false : options.changedOnly !== false,
+      changedOnly: full || metadataFallbackOnly ? false : options.changedOnly !== false,
       forceReindex: options.forceReindex === true,
-      reprocessExisting: full,
+      reprocessExisting: full || metadataFallbackOnly,
+      metadataFallbackOnly,
       profile: options.profile === true,
     });
     console.log("\nIndex complete");

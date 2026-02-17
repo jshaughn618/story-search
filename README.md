@@ -234,6 +234,7 @@ npm run start -w tools/indexer -- index ./sample_stories
 npm run start -w tools/indexer -- index ./sample_stories --changed-only
 npm run start -w tools/indexer -- index ./sample_stories --changed-only --profile
 npm run start -w tools/indexer -- index ./sample_stories --full
+npm run start -w tools/indexer -- index ./sample_stories --metadata-fallback-only
 npm run start -w tools/indexer -- index ./sample_stories --full --force-reindex
 npm run start -w tools/indexer -- status
 npm run start -w tools/tagger -- apply --rules rules/tags.json --source tools/indexer/output_text --dry-run
@@ -244,6 +245,7 @@ Notes:
 - The indexer auto-loads the nearest `.env` (including repo root `.env` when run with `-w tools/indexer`).
 - Folder paths can be repo-relative (for example `./stories/test`) or package-relative.
 - LM Studio system prompt content is loaded from `tools/indexer/prompts/system_prompt.txt` by default.
+- `--metadata-fallback-only` implies reprocessing mode and targets only files tied to stories where `STATUS_NOTES` contains a prior metadata fallback marker.
 
 ### 6) Run locally
 

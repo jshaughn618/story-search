@@ -5,6 +5,7 @@ import type {
   ExistingStoryRow,
   IndexedStory,
   IndexerConfig,
+  SourcePathRow,
   StorySourceRecord,
   VectorRecord,
 } from "./types.js";
@@ -153,6 +154,18 @@ export class CloudflareClient {
     return this.d1Query<ExistingSourceRow>(
       "SELECT STORY_ID, SOURCE_PATH, RAW_HASH FROM STORY_SOURCES",
     );
+  }
+
+  async getSourcePathsForMetadataFallbackStories(): Promise<string[]> {
+    const rows = await this.d1Query<SourcePathRow>(
+      `
+      SELECT ss.SOURCE_PATH
+      FROM STORY_SOURCES ss
+      INNER JOIN STORIES s ON s.STORY_ID = ss.STORY_ID
+      WHERE LOWER(COALESCE(s.STATUS_NOTES, '')) LIKE '%metadata extraction fallback used:%'
+      `,
+    );
+    return rows.map((row) => row.SOURCE_PATH);
   }
 
   async getStoryByCanonHash(canonHash: string): Promise<ExistingStoryRow | null> {

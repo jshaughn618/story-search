@@ -173,7 +173,6 @@ async function callChatCompletion(
       body: JSON.stringify({
         model,
         temperature: 0.1,
-        response_format: { type: "text" },
         messages,
       }),
     });
@@ -213,7 +212,11 @@ async function parseMetadataWithRepair(config: IndexerConfig, raw: string): Prom
     return normalizeMetadata(JSON.parse(extractJson(raw)));
   } catch {
     const systemPrompt = await loadSystemPrompt(config.lmStudioSystemPromptPath);
-    const repairPrompt = `Fix this so it is valid JSON for the required schema and return JSON only:\n\n${raw}`;
+    const repairPrompt =
+      "Rewrite the following into valid JSON only with exactly these keys: " +
+      "title, summary_short, summary_long, themes, tags. " +
+      "Do not include markdown, comments, or extra keys.\n\n" +
+      raw;
     const repaired = await callChatCompletion(
       config.lmStudioBaseUrl,
       config.lmStudioApiKey,
@@ -239,16 +242,14 @@ export async function extractStoryMetadata(
   const textForModel = buildMetadataPrompt(storyText);
 
   const userPrompt = `Source path: ${sourcePath}
-Return STRICT JSON only with this schema:
-{
-  "title": "string",
-  "summary_short": "<=280 chars",
-  "summary_long": "3-6 sentences",
-  "themes": ["up to 8 strings"],
-  "tags": ["up to 12 strings"]
-}
-Use only what you see in the story text. Do not infer from external sources.
-Do not include markdown or extra keys.
+Return JSON only (no markdown) as an object with exactly these keys:
+- title (string)
+- summary_short (string, <= 280 chars)
+- summary_long (string, 3-6 sentences)
+- themes (array of up to 8 strings)
+- tags (array of up to 12 strings)
+Use only what appears in the story text. Do not infer from external sources.
+Do not include extra keys.
 
 Analyze the story text below and return only JSON.
 

@@ -116,6 +116,10 @@ export interface ExistingSourceRow {
   RAW_HASH: string;
 }
 
+export interface SourcePathRow {
+  SOURCE_PATH: string;
+}
+
 export interface DuplicateGroupRow {
   storyId: string;
   canonHash: string;
