@@ -38,6 +38,9 @@ export function ReaderPage() {
   const [updatingRead, setUpdatingRead] = useState(false);
   const [updatingTags, setUpdatingTags] = useState(false);
   const [updatingDetails, setUpdatingDetails] = useState(false);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftAuthor, setDraftAuthor] = useState("");
   const [bookmarks, setBookmarks] = useState<StoryBookmark[]>([]);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState<number | null>(null);
@@ -310,31 +313,40 @@ export function ReaderPage() {
     }
   };
 
-  const editStoryDetails = async () => {
+  const startEditingDetails = () => {
+    if (!data) {
+      return;
+    }
+    setDraftTitle(data.story.title);
+    setDraftAuthor(data.story.author ?? "");
+    setIsEditingDetails(true);
+  };
+
+  const cancelEditingDetails = () => {
+    if (updatingDetails) {
+      return;
+    }
+    setIsEditingDetails(false);
+  };
+
+  const saveStoryDetails = async () => {
     if (!id || !data || updatingDetails) {
       return;
     }
 
-    const titleInput = window.prompt("Edit story title", data.story.title);
-    if (titleInput === null) {
-      return;
-    }
-    const nextTitle = titleInput.trim().replace(/\s+/g, " ");
+    const nextTitle = draftTitle.trim().replace(/\s+/g, " ");
     if (!nextTitle) {
       setToast("Title cannot be blank.");
       return;
     }
 
-    const authorInput = window.prompt("Edit author (leave blank for unknown)", data.story.author ?? "");
-    if (authorInput === null) {
-      return;
-    }
-    const authorValue = authorInput.trim().replace(/\s+/g, " ");
+    const authorValue = draftAuthor.trim().replace(/\s+/g, " ");
     const nextAuthor = authorValue ? authorValue : null;
 
     const previousTitle = data.story.title;
     const previousAuthor = data.story.author;
     if (nextTitle === previousTitle && nextAuthor === previousAuthor) {
+      setIsEditingDetails(false);
       return;
     }
 
@@ -367,6 +379,7 @@ export function ReaderPage() {
           : current,
       );
       setToast("Story details updated.");
+      setIsEditingDetails(false);
     } catch (updateError) {
       setData((current) =>
         current
@@ -531,13 +544,15 @@ export function ReaderPage() {
 
   const backTo = (location.state as { from?: string } | null)?.from;
   const readerMetaParts = [
-    data?.story.author && data.story.author.trim().toLowerCase() !== "unknown"
-      ? `by ${data.story.author}`
-      : null,
     data?.story.genre && data.story.genre.trim().toLowerCase() !== "unknown" ? data.story.genre : null,
     data?.story.tone && data.story.tone.trim().toLowerCase() !== "unknown" ? data.story.tone : null,
     data ? `${data.story.wordCount} words` : null,
   ].filter((value): value is string => Boolean(value));
+  const normalizedAuthor = data?.story.author?.trim() ?? "";
+  const authorLabel =
+    normalizedAuthor && normalizedAuthor.toLowerCase() !== "unknown"
+      ? `by ${normalizedAuthor}`
+      : "Author unknown";
 
   if (loading) {
     return <main className="reader-page">Loading story...</main>;
@@ -573,9 +588,6 @@ export function ReaderPage() {
           </button>
           <button type="button" onClick={addUserTag} disabled={updatingTags}>
             {updatingTags ? "Updating..." : "Add tag"}
-          </button>
-          <button type="button" onClick={() => void editStoryDetails()} disabled={updatingDetails}>
-            {updatingDetails ? "Saving..." : "Edit title/author"}
           </button>
         </div>
 
@@ -627,12 +639,55 @@ export function ReaderPage() {
       </header>
 
       <section className="reader-meta">
-        <h1>
-          {data.story.title}
-          <span className={`reader-status-badge ${data.story.isRead ? "is-read" : "is-unread"}`}>
-            {data.story.isRead ? "Read" : "Unread"}
-          </span>
-        </h1>
+        {isEditingDetails ? (
+          <div className="reader-details-editor">
+            <label>
+              Title
+              <input
+                type="text"
+                value={draftTitle}
+                onChange={(event) => setDraftTitle(event.target.value)}
+                maxLength={220}
+                disabled={updatingDetails}
+              />
+            </label>
+            <label>
+              Author
+              <input
+                type="text"
+                value={draftAuthor}
+                onChange={(event) => setDraftAuthor(event.target.value)}
+                maxLength={160}
+                placeholder="Unknown"
+                disabled={updatingDetails}
+              />
+            </label>
+            <div className="reader-details-editor-actions">
+              <button type="button" onClick={() => void saveStoryDetails()} disabled={updatingDetails}>
+                {updatingDetails ? "Saving..." : "Save"}
+              </button>
+              <button type="button" className="ghost" onClick={cancelEditingDetails} disabled={updatingDetails}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <h1>
+            <span>{data.story.title}</span>
+            <button
+              type="button"
+              className="reader-title-edit-button"
+              onClick={startEditingDetails}
+              aria-label="Edit story title and author"
+            >
+              ✎
+            </button>
+            <span className={`reader-status-badge ${data.story.isRead ? "is-read" : "is-unread"}`}>
+              {data.story.isRead ? "Read" : "Unread"}
+            </span>
+          </h1>
+        )}
+        <p className="reader-author-line">{authorLabel}</p>
         <p>{readerMetaParts.join(" • ")}</p>
         <div className="reader-tags">
           {data.story.tags.slice(0, 8).map((tag) => (

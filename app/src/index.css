@@ -454,6 +454,73 @@ a {
   color: var(--muted);
 }
 
+.reader-author-line {
+  font-weight: 600;
+}
+
+.reader-title-edit-button {
+  border: 1px solid #b5c0c1;
+  background: #fff;
+  color: var(--ink);
+  border-radius: 999px;
+  width: 1.9rem;
+  height: 1.9rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.reader-title-edit-button:hover {
+  background: #f3f6f6;
+}
+
+.reader-details-editor {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 720px;
+}
+
+.reader-details-editor label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.reader-details-editor input {
+  border: 1px solid #c2c0ba;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+  background: #fff;
+}
+
+.reader-details-editor-actions {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.reader-details-editor-actions button {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem;
+  font: inherit;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+}
+
+.reader-details-editor-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reader-details-editor-actions .ghost {
+  border-color: #2d4f54;
+  background: #fff;
+  color: #1f3538;
+}
+
 .reader-tags {
   margin-top: 0.65rem;
   display: flex;
@@ -621,6 +688,24 @@ a {
   border-color: #4c6265;
 }
 
+.theme-dark .reader-title-edit-button {
+  background: #1e2b2e;
+  color: #e8f1f1;
+  border-color: #4c6265;
+}
+
+.theme-dark .reader-details-editor input {
+  background: #1e2b2e;
+  color: #e8f1f1;
+  border-color: #4c6265;
+}
+
+.theme-dark .reader-details-editor-actions .ghost {
+  background: #1e2b2e;
+  color: #e8f1f1;
+  border-color: #4c6265;
+}
+
 .theme-dark .reader-scroll-rail {
   border-color: rgba(105, 124, 126, 0.7);
   background: rgba(26, 35, 38, 0.75);
@@ -647,6 +732,23 @@ a {
 .theme-sepia .reader-body {
   background: rgba(255, 249, 238, 0.86);
   border-color: #c6af8e;
+}
+
+.theme-sepia .reader-title-edit-button {
+  border-color: #b59a78;
+  background: #fff6e6;
+  color: #4e3925;
+}
+
+.theme-sepia .reader-details-editor input {
+  border-color: #c6af8e;
+  background: #fff6e6;
+}
+
+.theme-sepia .reader-details-editor-actions .ghost {
+  border-color: #8b6840;
+  background: #fff6e6;
+  color: #4e3925;
 }
 
 .theme-sepia .reader-scroll-rail {

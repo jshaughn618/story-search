@@ -337,53 +337,6 @@ export function LibraryPage() {
     }
   };
 
-  const editStoryDetails = async (story: StoryResult) => {
-    if (updatingStoryId) {
-      return;
-    }
-
-    const titleInput = window.prompt("Edit story title", story.title);
-    if (titleInput === null) {
-      return;
-    }
-    const nextTitle = titleInput.trim().replace(/\s+/g, " ");
-    if (!nextTitle) {
-      setToast("Title cannot be blank.");
-      return;
-    }
-
-    const authorInput = window.prompt("Edit author (leave blank for unknown)", story.author ?? "");
-    if (authorInput === null) {
-      return;
-    }
-    const authorValue = authorInput.trim().replace(/\s+/g, " ");
-    const nextAuthor = authorValue ? authorValue : null;
-
-    if (nextTitle === story.title && nextAuthor === story.author) {
-      return;
-    }
-
-    const previousTitle = story.title;
-    const previousAuthor = story.author;
-    patchStoryInResults(story.storyId, { title: nextTitle, author: nextAuthor });
-    setUpdatingStoryId(story.storyId);
-
-    try {
-      const response = await updateStory(story.storyId, { title: nextTitle, author: nextAuthor });
-      patchStoryInResults(story.storyId, {
-        title: response.story.title,
-        author: response.story.author,
-      });
-      setToast("Story details updated.");
-    } catch (updateError) {
-      patchStoryInResults(story.storyId, { title: previousTitle, author: previousAuthor });
-      const message = updateError instanceof Error ? updateError.message : "Failed to update story details";
-      setToast(`Update failed: ${message}`);
-    } finally {
-      setUpdatingStoryId(null);
-    }
-  };
-
   const addUserTag = async (story: StoryResult) => {
     if (updatingStoryId) {
       return;
@@ -611,17 +564,6 @@ export function LibraryPage() {
 
                   {menuOpen ? (
                     <div className="story-menu" role="menu">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="story-menu-item"
-                        onClick={() => {
-                          setOpenMenuStoryId(null);
-                          void editStoryDetails(story);
-                        }}
-                      >
-                        Edit title/author
-                      </button>
                       <button
                         type="button"
                         role="menuitem"
