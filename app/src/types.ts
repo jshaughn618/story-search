@@ -97,6 +97,8 @@ export interface StoryUpdateRequest {
   isRead?: boolean;
   addUserTag?: string;
   removeUserTag?: string;
+  title?: string;
+  author?: string | null;
 }
 
 export interface StoryUpdateResponse {

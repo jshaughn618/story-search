@@ -37,6 +37,7 @@ export function ReaderPage() {
   const [highlightedParagraph, setHighlightedParagraph] = useState<number | null>(null);
   const [updatingRead, setUpdatingRead] = useState(false);
   const [updatingTags, setUpdatingTags] = useState(false);
+  const [updatingDetails, setUpdatingDetails] = useState(false);
   const [bookmarks, setBookmarks] = useState<StoryBookmark[]>([]);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [currentParagraphIndex, setCurrentParagraphIndex] = useState<number | null>(null);
@@ -309,6 +310,83 @@ export function ReaderPage() {
     }
   };
 
+  const editStoryDetails = async () => {
+    if (!id || !data || updatingDetails) {
+      return;
+    }
+
+    const titleInput = window.prompt("Edit story title", data.story.title);
+    if (titleInput === null) {
+      return;
+    }
+    const nextTitle = titleInput.trim().replace(/\s+/g, " ");
+    if (!nextTitle) {
+      setToast("Title cannot be blank.");
+      return;
+    }
+
+    const authorInput = window.prompt("Edit author (leave blank for unknown)", data.story.author ?? "");
+    if (authorInput === null) {
+      return;
+    }
+    const authorValue = authorInput.trim().replace(/\s+/g, " ");
+    const nextAuthor = authorValue ? authorValue : null;
+
+    const previousTitle = data.story.title;
+    const previousAuthor = data.story.author;
+    if (nextTitle === previousTitle && nextAuthor === previousAuthor) {
+      return;
+    }
+
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            story: {
+              ...current.story,
+              title: nextTitle,
+              author: nextAuthor,
+            },
+          }
+        : current,
+    );
+    setUpdatingDetails(true);
+
+    try {
+      const response = await updateStory(id, { title: nextTitle, author: nextAuthor });
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              story: {
+                ...current.story,
+                title: response.story.title,
+                author: response.story.author,
+              },
+            }
+          : current,
+      );
+      setToast("Story details updated.");
+    } catch (updateError) {
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              story: {
+                ...current.story,
+                title: previousTitle,
+                author: previousAuthor,
+              },
+            }
+          : current,
+      );
+      const message = updateError instanceof Error ? updateError.message : "Failed to update story details";
+      setToast(`Update failed: ${message}`);
+    } finally {
+      setUpdatingDetails(false);
+    }
+  };
+
   const removeUserTag = async (tag: string) => {
     if (!id || !data || updatingTags) {
       return;
@@ -453,6 +531,9 @@ export function ReaderPage() {
 
   const backTo = (location.state as { from?: string } | null)?.from;
   const readerMetaParts = [
+    data?.story.author && data.story.author.trim().toLowerCase() !== "unknown"
+      ? `by ${data.story.author}`
+      : null,
     data?.story.genre && data.story.genre.trim().toLowerCase() !== "unknown" ? data.story.genre : null,
     data?.story.tone && data.story.tone.trim().toLowerCase() !== "unknown" ? data.story.tone : null,
     data ? `${data.story.wordCount} words` : null,
@@ -492,6 +573,9 @@ export function ReaderPage() {
           </button>
           <button type="button" onClick={addUserTag} disabled={updatingTags}>
             {updatingTags ? "Updating..." : "Add tag"}
+          </button>
+          <button type="button" onClick={() => void editStoryDetails()} disabled={updatingDetails}>
+            {updatingDetails ? "Saving..." : "Edit title/author"}
           </button>
         </div>
 

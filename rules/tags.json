@@ -78,7 +78,7 @@
   },
   {
     "tag": "Torture",
-    "anyOf": ["torture", "tortured", "tortures", "torturing", "pain", "painful", "suffering", "torment", "tormented", "torments", "torturous", "whipping", "whipped", "whips", "whipping", "cane", "caning", "caned", "paddle", "paddling", "paddled", "paddles"],
+    "anyOf": ["torture", "tortured", "tortures", "torturing", "suffering", "torment", "tormented", "torments", "torturous", "whipping", "whipped", "whips", "whipping", "cane", "caning", "caned", "paddle", "paddling", "paddled", "paddles"],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true

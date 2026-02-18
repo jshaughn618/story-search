@@ -17,6 +17,8 @@ interface StoryPatchBody {
   isRead?: boolean;
   addUserTag?: string;
   removeUserTag?: string;
+  title?: string;
+  author?: string | null;
 }
 
 interface UserTagRow {
@@ -214,6 +216,34 @@ function normalizeUserTag(input: unknown): string | null {
   return normalized;
 }
 
+function normalizeStoryTitle(input: unknown): string | null {
+  if (typeof input !== "string") {
+    return null;
+  }
+  const normalized = input.trim().replace(/\s+/g, " ");
+  if (!normalized || normalized.length > 220) {
+    return null;
+  }
+  return normalized;
+}
+
+function normalizeAuthor(input: unknown): string | null {
+  if (input === null || input === undefined) {
+    return null;
+  }
+  if (typeof input !== "string") {
+    return null;
+  }
+  const normalized = input.trim().replace(/\s+/g, " ");
+  if (!normalized) {
+    return null;
+  }
+  if (normalized.length > 160) {
+    return null;
+  }
+  return normalized;
+}
+
 async function refreshStoryUserTags(env: Env, storyId: string): Promise<string[]> {
   const tagsResult = await env.STORY_DB.prepare(
     "SELECT TAG FROM STORY_USER_TAGS WHERE STORY_ID = ? ORDER BY TAG ASC",
@@ -252,15 +282,51 @@ export const onRequestPatch: PagesFunction<Env> = async ({ env, params, request 
     }
 
     const hasReadUpdate = typeof body.isRead === "boolean";
+    const hasTitleUpdate = Object.prototype.hasOwnProperty.call(body, "title");
+    const hasAuthorUpdate = Object.prototype.hasOwnProperty.call(body, "author");
     const addTag = normalizeUserTag(body.addUserTag);
     const removeTag = normalizeUserTag(body.removeUserTag);
-    if (!hasReadUpdate && !addTag && !removeTag) {
+    if (!hasReadUpdate && !addTag && !removeTag && !hasTitleUpdate && !hasAuthorUpdate) {
       return errorResponse("No valid changes in payload", 400);
+    }
+
+    let normalizedTitle: string | null = null;
+    if (hasTitleUpdate) {
+      normalizedTitle = normalizeStoryTitle(body.title);
+      if (!normalizedTitle) {
+        return errorResponse("Title must be 1-220 characters", 400);
+      }
+    }
+
+    let normalizedAuthor: string | null = null;
+    if (hasAuthorUpdate) {
+      if (body.author !== null && body.author !== undefined && typeof body.author !== "string") {
+        return errorResponse("Author must be a string or null", 400);
+      }
+
+      normalizedAuthor = normalizeAuthor(body.author);
+      if (typeof body.author === "string" && body.author.trim() && !normalizedAuthor) {
+        return errorResponse("Author must be 160 characters or fewer", 400);
+      }
     }
 
     if (hasReadUpdate) {
       await env.STORY_DB.prepare("UPDATE STORIES SET IS_READ = ? WHERE STORY_ID = ?")
         .bind(body.isRead ? 1 : 0, storyId)
+        .run();
+    }
+
+    if (hasTitleUpdate && hasAuthorUpdate) {
+      await env.STORY_DB.prepare("UPDATE STORIES SET TITLE = ?, AUTHOR = ? WHERE STORY_ID = ?")
+        .bind(normalizedTitle, normalizedAuthor, storyId)
+        .run();
+    } else if (hasTitleUpdate) {
+      await env.STORY_DB.prepare("UPDATE STORIES SET TITLE = ? WHERE STORY_ID = ?")
+        .bind(normalizedTitle, storyId)
+        .run();
+    } else if (hasAuthorUpdate) {
+      await env.STORY_DB.prepare("UPDATE STORIES SET AUTHOR = ? WHERE STORY_ID = ?")
+        .bind(normalizedAuthor, storyId)
         .run();
     }
 
