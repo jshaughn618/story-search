@@ -82,5 +82,131 @@
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
+  },
+  {
+    "tag": "Enema",
+    "anyOf": ["enema", "enemas", "enema play", "enema play", "enema roleplay", "enema role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Fisting",
+    "anyOf": ["fisting", "fist", "fisted", "fists", "fist play", "fist roleplay", "fist role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Anal",
+    "anyOf": ["anal", "anal sex", "anal play", "anal roleplay", "anal role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Incest",
+    "anyOf": ["incest", "incestuous", "family sex", "family roleplay", "family role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Bestiality",
+    "anyOf": ["bestiality", "bestial", "zoophilia", "zoophilic", "animal sex", "animal roleplay", "animal role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Scat",
+    "anyOf": ["scat", "scat play", "scat roleplay", "scat role play", "feces", "defecation", "poop"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Vore",
+    "anyOf": ["vore", "vorarephilia", "vorarephilic", "vore play", "vore roleplay", "vore role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Guro",
+    "anyOf": ["guro", "guro art", "guro manga", "guro anime", "guro roleplay", "guro role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Necrophilia",
+    "anyOf": ["necrophilia", "necrophilic", "necrophile", "necrophiles", "necrophilia play", "necrophilia roleplay", "necrophilia role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Snuff",
+    "anyOf": ["snuff", "snuff film", "snuff movie", "snuff roleplay", "snuff role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Gore",
+    "anyOf": ["gore", "gore art", "gore manga", "gore anime", "gore roleplay", "gore role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Diaper",
+    "anyOf": ["diaper", "diapers", "diaper play", "diaper roleplay", "diaper role play", "nappy", "nappies"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Pregnancy",
+    "anyOf": ["pregnancy", "pregnant", "preggo", "preggos", "preg play", "preg roleplay", "preg role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Cuckold",
+    "anyOf": ["cuckold", "cuckolding", "cuckoldry", "cuckold play", "cuckold roleplay", "cuckold role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Crossdressing",
+    "anyOf": ["crossdressing", "crossdress", "crossdresser", "crossdressers", "crossdressing play", "crossdressing roleplay", "crossdressing role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Sissification",
+    "anyOf": ["sissification", "sissy", "sissies", "sissy play", "sissy roleplay", "sissy role play"],
+    "min  Count": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Chastity",
+    "anyOf": ["chastity", "chastity play", "chastity roleplay", "chastity role play", "chastity device", "chastity belt", "chastity cage"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Cuckquean",
+    "anyOf": ["cuckquean", "cuckqueaning", "cuckqueanry", "cuckquean play", "cuckquean roleplay", "cuckquean role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
   }
 ]

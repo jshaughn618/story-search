@@ -170,6 +170,16 @@ a {
   border-color: var(--accent);
 }
 
+.tag-chip.excluded {
+  background: #fdecec;
+  border-color: #b64a4a;
+  color: #7a2121;
+}
+
+.tag-chip.excluded span {
+  color: #8d4a4a;
+}
+
 .results-meta {
   display: flex;
   flex-wrap: wrap;

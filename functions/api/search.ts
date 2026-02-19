@@ -83,10 +83,16 @@ function normalizeFilters(filters?: SearchFilters): Required<SearchFilters> {
   const tags = Array.isArray(filters?.tags)
     ? filters.tags.map((tag) => tag.trim()).filter(Boolean)
     : [];
+  const selectedLower = new Set(tags.map((tag) => tag.toLowerCase()));
+  const excludedTags = Array.isArray(filters?.excludedTags)
+    ? filters.excludedTags
+        .map((tag) => tag.trim())
+        .filter((tag) => Boolean(tag) && !selectedLower.has(tag.toLowerCase()))
+    : [];
   const statuses = normalizeStatuses(filters?.statuses);
   const hideRead = filters?.hideRead === true;
 
-  return { genre, tone, tags, statuses, hideRead };
+  return { genre, tone, tags, excludedTags, statuses, hideRead };
 }
 
 function clampLimit(limit?: number): number {
@@ -196,16 +202,18 @@ async function fetchStoriesByIds(env: Env, storyIds: string[]): Promise<Map<stri
   return byId;
 }
 
-function storyHasTags(story: StoryRow, selectedTags: string[]): boolean {
-  if (selectedTags.length === 0) {
-    return true;
-  }
+function storyMatchesTags(story: StoryRow, selectedTags: string[], excludedTags: string[]): boolean {
   const tagSet = new Set(
     [...parseStringArray(story.TAGS_JSON), ...parseStringArray(story.USER_TAGS_JSON)].map((tag) =>
       tag.toLowerCase(),
     ),
   );
-  return selectedTags.every((tag) => tagSet.has(tag.toLowerCase()));
+
+  if (selectedTags.length > 0 && !selectedTags.every((tag) => tagSet.has(tag.toLowerCase()))) {
+    return false;
+  }
+
+  return !excludedTags.some((tag) => tagSet.has(tag.toLowerCase()));
 }
 
 function storyMatchesStatus(story: StoryRow, statuses: StoryStatus[]): boolean {
@@ -289,6 +297,25 @@ function applyFilterClauses(
       )
     `);
     params.push(...normalizedTags, normalizedTags.length);
+  }
+
+  if (filters.excludedTags.length > 0) {
+    const normalizedExcludedTags = filters.excludedTags.map((tag) => tag.toLowerCase());
+    const excludedTagPlaceholders = normalizedExcludedTags.map(() => "?").join(",");
+    clauses.push(`
+      STORY_ID NOT IN (
+        SELECT STORY_ID
+        FROM (
+          SELECT s.STORY_ID AS STORY_ID, LOWER(TRIM(j.value)) AS TAG
+          FROM STORIES s, json_each(COALESCE(s.TAGS_JSON, '[]')) j
+          WHERE j.type = 'text' AND TRIM(j.value) != ''
+          UNION
+          SELECT STORY_ID, LOWER(TAG) AS TAG FROM STORY_USER_TAGS
+        )
+        WHERE TAG IN (${excludedTagPlaceholders})
+      )
+    `);
+    params.push(...normalizedExcludedTags);
   }
 
   if (filters.hideRead) {
@@ -476,7 +503,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         }
 
         if (
-          !storyHasTags(story, filters.tags) ||
+          !storyMatchesTags(story, filters.tags, filters.excludedTags) ||
           !storyMatchesStatus(story, filters.statuses) ||
           !storyMatchesReadFilter(story, filters.hideRead)
         ) {

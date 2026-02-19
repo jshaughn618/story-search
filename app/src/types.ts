@@ -66,6 +66,7 @@ export interface SearchRequest {
     genre: string | null;
     tone: string | null;
     tags: string[];
+    excludedTags?: string[];
     statuses: StoryStatus[];
     hideRead?: boolean;
   };

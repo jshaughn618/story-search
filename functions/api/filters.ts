@@ -50,6 +50,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
   const tone = requestUrl.searchParams.get("tone")?.trim() || null;
   const tagQuery = requestUrl.searchParams.get("tagQuery")?.trim().toLowerCase() || "";
   const selectedTags = parseCsvParam(requestUrl.searchParams.get("tags"));
+  const selectedTagSet = new Set(selectedTags.map((tag) => tag.toLowerCase()));
+  const excludedTags = parseCsvParam(requestUrl.searchParams.get("excludedTags")).filter(
+    (tag) => !selectedTagSet.has(tag.toLowerCase()),
+  );
   const statuses = parseStatuses(requestUrl.searchParams.get("statuses"));
   const hideRead = requestUrl.searchParams.get("hideRead") === "1";
 
@@ -95,6 +99,25 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
       )
     `);
     filterParams.push(...normalized, normalized.length);
+  }
+
+  if (excludedTags.length > 0) {
+    const normalized = excludedTags.map((tag) => tag.toLowerCase());
+    const placeholders = normalized.map(() => "?").join(",");
+    filterClauses.push(`
+      s.STORY_ID NOT IN (
+        SELECT STORY_ID
+        FROM (
+          SELECT s2.STORY_ID AS STORY_ID, LOWER(TRIM(j2.value)) AS TAG
+          FROM STORIES s2, json_each(COALESCE(s2.TAGS_JSON, '[]')) j2
+          WHERE j2.type = 'text' AND TRIM(j2.value) != ''
+          UNION
+          SELECT STORY_ID, LOWER(TAG) AS TAG FROM STORY_USER_TAGS
+        )
+        WHERE TAG IN (${placeholders})
+      )
+    `);
+    filterParams.push(...normalized);
   }
 
   const filteredWhere = filterClauses.length > 0 ? `WHERE ${filterClauses.join(" AND ")}` : "";

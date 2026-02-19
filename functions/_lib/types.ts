@@ -21,6 +21,7 @@ export interface SearchFilters {
   genre?: string | null;
   tone?: string | null;
   tags?: string[];
+  excludedTags?: string[];
   statuses?: StoryStatus[];
   hideRead?: boolean;
 }

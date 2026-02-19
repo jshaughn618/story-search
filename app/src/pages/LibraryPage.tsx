@@ -34,6 +34,7 @@ export function LibraryPage() {
   const [genre, setGenre] = useState<string>("");
   const [tone, setTone] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [excludedTags, setExcludedTags] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("ALL");
   const [hideRead, setHideRead] = useState(false);
   const [results, setResults] = useState<StoryResult[]>([]);
@@ -57,8 +58,8 @@ export function LibraryPage() {
   const activeFilters = useMemo(() => {
     const statusActive = statusFilter === "ALL" ? 0 : 1;
     const readActive = hideRead ? 1 : 0;
-    return [genre, tone, ...selectedTags].filter(Boolean).length + statusActive + readActive;
-  }, [genre, tone, selectedTags, statusFilter, hideRead]);
+    return [genre, tone, ...selectedTags, ...excludedTags].filter(Boolean).length + statusActive + readActive;
+  }, [genre, tone, selectedTags, excludedTags, statusFilter, hideRead]);
 
   const filteredTagOptions = useMemo(() => {
     if (tagQuery.trim()) {
@@ -71,6 +72,7 @@ export function LibraryPage() {
     genre: genre || null,
     tone: tone || null,
     tags: selectedTags,
+    excludedTags,
     statuses: statusFilter === "ALL" ? [] : [statusFilter],
     hideRead,
     tagQuery,
@@ -79,13 +81,14 @@ export function LibraryPage() {
   const runSearch = async (
     next = 0,
     cursor: string | null = null,
-    overrides?: { tags?: string[]; hideRead?: boolean },
+    overrides?: { tags?: string[]; excludedTags?: string[]; hideRead?: boolean },
   ) => {
     setLoading(true);
     setError(null);
 
     try {
       const tagsToUse = overrides?.tags ?? selectedTags;
+      const excludedTagsToUse = overrides?.excludedTags ?? excludedTags;
       const hideReadToUse = overrides?.hideRead ?? hideRead;
       const baseRequest = {
         q: query,
@@ -93,6 +96,7 @@ export function LibraryPage() {
           genre: genre || null,
           tone: tone || null,
           tags: tagsToUse,
+          excludedTags: excludedTagsToUse,
           statuses: statusFilter === "ALL" ? [] : [statusFilter],
           hideRead: hideReadToUse,
         },
@@ -177,19 +181,28 @@ export function LibraryPage() {
   };
 
   const toggleTag = (tag: string) => {
-    setSelectedTags((current) => {
-      const next = current.includes(tag)
-        ? current.filter((value) => value !== tag)
-        : [...current, tag];
-      void runSearch(0, null, { tags: next });
-      return next;
-    });
+    let nextSelectedTags = selectedTags;
+    let nextExcludedTags = excludedTags;
+
+    if (selectedTags.includes(tag)) {
+      nextSelectedTags = selectedTags.filter((value) => value !== tag);
+      nextExcludedTags = excludedTags.includes(tag) ? excludedTags : [...excludedTags, tag];
+    } else if (excludedTags.includes(tag)) {
+      nextExcludedTags = excludedTags.filter((value) => value !== tag);
+    } else {
+      nextSelectedTags = [...selectedTags, tag];
+    }
+
+    setSelectedTags(nextSelectedTags);
+    setExcludedTags(nextExcludedTags);
+    void runSearch(0, null, { tags: nextSelectedTags, excludedTags: nextExcludedTags });
   };
 
   const clearFilters = () => {
     setGenre("");
     setTone("");
     setSelectedTags([]);
+    setExcludedTags([]);
     setStatusFilter("ALL");
     setHideRead(false);
   };
@@ -206,7 +219,7 @@ export function LibraryPage() {
   useEffect(() => {
     void refreshFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genre, tone, statusFilter, hideRead, selectedTags.join("|"), tagQuery]);
+  }, [genre, tone, statusFilter, hideRead, selectedTags.join("|"), excludedTags.join("|"), tagQuery]);
 
   useEffect(() => {
     if (!toast) {
@@ -484,19 +497,23 @@ export function LibraryPage() {
         <div className="tag-cloud">
           <input
             type="search"
-            placeholder="Search tags..."
+            placeholder="Search tags (click to include/exclude)..."
             value={tagQuery}
             onChange={(event) => setTagQuery(event.target.value)}
             aria-label="Search available tags"
           />
           {filteredTagOptions.map((tagInfo) => {
             const selected = selectedTags.includes(tagInfo.tag);
+            const excluded = excludedTags.includes(tagInfo.tag);
+            const className = selected ? "tag-chip selected" : excluded ? "tag-chip excluded" : "tag-chip";
+            const stateLabel = selected ? "include" : excluded ? "exclude" : "off";
             return (
               <button
                 key={tagInfo.tag}
-                className={selected ? "tag-chip selected" : "tag-chip"}
+                className={className}
                 onClick={() => toggleTag(tagInfo.tag)}
                 type="button"
+                title={`Tag filter: ${stateLabel}`}
               >
                 {tagInfo.tag} <span>{tagInfo.count}</span>
               </button>

@@ -22,6 +22,7 @@ interface FetchFiltersParams {
   genre?: string | null;
   tone?: string | null;
   tags?: string[];
+  excludedTags?: string[];
   statuses?: string[];
   hideRead?: boolean;
   tagQuery?: string;
@@ -62,6 +63,9 @@ export function fetchFilters(params?: FetchFiltersParams) {
   }
   if (params?.tags && params.tags.length > 0) {
     query.set("tags", params.tags.join(","));
+  }
+  if (params?.excludedTags && params.excludedTags.length > 0) {
+    query.set("excludedTags", params.excludedTags.join(","));
   }
   if (params?.statuses && params.statuses.length > 0) {
     query.set("statuses", params.statuses.join(","));
