@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { deleteStory, fetchFilters, searchStories, updateStory } from "../lib/api";
 import type { FiltersResponse, SearchResponse, StoryResult, StoryStatus } from "../types";
 
@@ -26,23 +26,145 @@ const statusLabel: Record<StatusFilterValue, string> = {
   EXTRACTION_FAILED: "Extraction failed",
 };
 
+interface LibraryUrlState {
+  query: string;
+  genre: string;
+  tone: string;
+  selectedTags: string[];
+  excludedTags: string[];
+  statusFilter: StatusFilterValue;
+  hideRead: boolean;
+  tagQuery: string;
+  offset: number;
+  cursor: string | null;
+}
+
+function parseCsvParam(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
+}
+
+function normalizeOffset(value: string | null): number {
+  if (!value) {
+    return 0;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return 0;
+  }
+  return parsed;
+}
+
+function normalizeStatusFilter(value: string | null): StatusFilterValue {
+  if (!value) {
+    return "ALL";
+  }
+  const upper = value.trim().toUpperCase() as StatusFilterValue;
+  return upper in statusLabel ? upper : "ALL";
+}
+
+function parseLibraryUrlState(searchParams: URLSearchParams): LibraryUrlState {
+  const selectedTags = parseCsvParam(searchParams.get("tags"));
+  const selectedTagSet = new Set(selectedTags.map((tag) => tag.toLowerCase()));
+  const excludedTags = parseCsvParam(searchParams.get("excludedTags")).filter(
+    (tag) => !selectedTagSet.has(tag.toLowerCase()),
+  );
+
+  return {
+    query: searchParams.get("q")?.trim() ?? "",
+    genre: searchParams.get("genre")?.trim() ?? "",
+    tone: searchParams.get("tone")?.trim() ?? "",
+    selectedTags,
+    excludedTags,
+    statusFilter: normalizeStatusFilter(searchParams.get("status")),
+    hideRead: searchParams.get("hideRead") === "1",
+    tagQuery: searchParams.get("tagQuery")?.trim() ?? "",
+    offset: normalizeOffset(searchParams.get("offset")),
+    cursor: searchParams.get("cursor")?.trim() || null,
+  };
+}
+
+function buildLibraryUrlSearchParams(state: {
+  query: string;
+  genre: string;
+  tone: string;
+  selectedTags: string[];
+  excludedTags: string[];
+  statusFilter: StatusFilterValue;
+  hideRead: boolean;
+  tagQuery: string;
+  offset: number;
+  cursor: string | null;
+}) {
+  const params = new URLSearchParams();
+
+  if (state.query.trim()) {
+    params.set("q", state.query.trim());
+  }
+  if (state.genre) {
+    params.set("genre", state.genre);
+  }
+  if (state.tone) {
+    params.set("tone", state.tone);
+  }
+  if (state.selectedTags.length > 0) {
+    params.set("tags", state.selectedTags.join(","));
+  }
+  if (state.excludedTags.length > 0) {
+    params.set("excludedTags", state.excludedTags.join(","));
+  }
+  if (state.statusFilter !== "ALL") {
+    params.set("status", state.statusFilter);
+  }
+  if (state.hideRead) {
+    params.set("hideRead", "1");
+  }
+  if (state.tagQuery.trim()) {
+    params.set("tagQuery", state.tagQuery.trim());
+  }
+  if (state.offset > 0) {
+    params.set("offset", String(state.offset));
+  }
+  if (state.cursor) {
+    params.set("cursor", state.cursor);
+  }
+
+  return params;
+}
+
+function hasTagValue(values: string[], tag: string): boolean {
+  const normalized = tag.toLowerCase();
+  return values.some((value) => value.toLowerCase() === normalized);
+}
+
+function removeTagValue(values: string[], tag: string): string[] {
+  const normalized = tag.toLowerCase();
+  return values.filter((value) => value.toLowerCase() !== normalized);
+}
+
 export function LibraryPage() {
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialUrlState = useMemo(() => parseLibraryUrlState(searchParams), [searchParams]);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [filters, setFilters] = useState<FiltersResponse>(emptyFilters);
-  const [query, setQuery] = useState("");
-  const [genre, setGenre] = useState<string>("");
-  const [tone, setTone] = useState<string>("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [excludedTags, setExcludedTags] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("ALL");
-  const [hideRead, setHideRead] = useState(false);
+  const [query, setQuery] = useState(initialUrlState.query);
+  const [appliedQuery, setAppliedQuery] = useState(initialUrlState.query);
+  const [genre, setGenre] = useState<string>(initialUrlState.genre);
+  const [tone, setTone] = useState<string>(initialUrlState.tone);
+  const [selectedTags, setSelectedTags] = useState<string[]>(initialUrlState.selectedTags);
+  const [excludedTags, setExcludedTags] = useState<string[]>(initialUrlState.excludedTags);
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>(initialUrlState.statusFilter);
+  const [hideRead, setHideRead] = useState(initialUrlState.hideRead);
   const [results, setResults] = useState<StoryResult[]>([]);
   const [mode, setMode] = useState<SearchResponse["mode"]>("browse");
   const [nextOffset, setNextOffset] = useState<number | null>(null);
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useState(initialUrlState.offset);
   const [totalCandidates, setTotalCandidates] = useState<number | undefined>(undefined);
-  const [exactCursor, setExactCursor] = useState<string | null>(null);
+  const [exactCursor, setExactCursor] = useState<string | null>(initialUrlState.cursor);
   const [exactNextCursor, setExactNextCursor] = useState<string | null>(null);
   const [exactCursorHistory, setExactCursorHistory] = useState<string[]>([]);
   const [debugScores, setDebugScores] = useState(false);
@@ -50,7 +172,8 @@ export function LibraryPage() {
   const [deleteTarget, setDeleteTarget] = useState<StoryResult | null>(null);
   const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
   const [updatingStoryId, setUpdatingStoryId] = useState<string | null>(null);
-  const [tagQuery, setTagQuery] = useState("");
+  const [tagQuery, setTagQuery] = useState(initialUrlState.tagQuery);
+  const [searchTagFacets, setSearchTagFacets] = useState<FiltersResponse["tags"]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,12 +184,36 @@ export function LibraryPage() {
     return [genre, tone, ...selectedTags, ...excludedTags].filter(Boolean).length + statusActive + readActive;
   }, [genre, tone, selectedTags, excludedTags, statusFilter, hideRead]);
 
-  const filteredTagOptions = useMemo(() => {
-    if (tagQuery.trim()) {
-      return filters.tags;
+  const activeTagFacets = useMemo(() => {
+    const source = appliedQuery.trim() ? searchTagFacets : filters.tags;
+    const merged = new Map<string, FiltersResponse["tags"][number]>();
+
+    for (const tagInfo of source) {
+      merged.set(tagInfo.tag.toLowerCase(), tagInfo);
     }
-    return filters.tags.slice(0, 60);
-  }, [filters.tags, tagQuery]);
+
+    for (const tag of [...selectedTags, ...excludedTags]) {
+      const key = tag.toLowerCase();
+      if (!merged.has(key)) {
+        merged.set(key, { tag, count: 0 });
+      }
+    }
+
+    return [...merged.values()].sort((a, b) => {
+      if (b.count !== a.count) {
+        return b.count - a.count;
+      }
+      return a.tag.localeCompare(b.tag);
+    });
+  }, [appliedQuery, searchTagFacets, filters.tags, selectedTags, excludedTags]);
+
+  const filteredTagOptions = useMemo(() => {
+    const trimmed = tagQuery.trim().toLowerCase();
+    if (trimmed.length > 0) {
+      return activeTagFacets.filter((tagInfo) => tagInfo.tag.toLowerCase().includes(trimmed));
+    }
+    return activeTagFacets.slice(0, 60);
+  }, [activeTagFacets, tagQuery]);
 
   const currentFilterParams = () => ({
     genre: genre || null,
@@ -90,8 +237,9 @@ export function LibraryPage() {
       const tagsToUse = overrides?.tags ?? selectedTags;
       const excludedTagsToUse = overrides?.excludedTags ?? excludedTags;
       const hideReadToUse = overrides?.hideRead ?? hideRead;
+      const queryToUse = query;
       const baseRequest = {
-        q: query,
+        q: queryToUse,
         filters: {
           genre: genre || null,
           tone: tone || null,
@@ -142,6 +290,8 @@ export function LibraryPage() {
       setOffset(next);
       setNextOffset(response.nextOffset);
       setTotalCandidates(response.totalCandidates);
+      setAppliedQuery(queryToUse);
+      setSearchTagFacets(queryToUse.trim() ? response.facetTags ?? [] : []);
       if (response.mode === "exact") {
         setExactCursor(cursor);
         setExactNextCursor(response.nextCursor ?? null);
@@ -150,6 +300,22 @@ export function LibraryPage() {
         setExactNextCursor(null);
         setExactCursorHistory([]);
       }
+
+      setSearchParams(
+        buildLibraryUrlSearchParams({
+          query: queryToUse,
+          genre,
+          tone,
+          selectedTags: tagsToUse,
+          excludedTags: excludedTagsToUse,
+          statusFilter,
+          hideRead: hideReadToUse,
+          tagQuery,
+          offset: next,
+          cursor: response.mode === "exact" ? cursor : null,
+        }),
+        { replace: true },
+      );
     } catch (searchError) {
       setError(searchError instanceof Error ? searchError.message : "Search failed");
     } finally {
@@ -165,7 +331,7 @@ export function LibraryPage() {
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load filters");
       }
-      await runSearch(0);
+      await runSearch(initialUrlState.offset, initialUrlState.cursor);
     };
 
     void init();
@@ -184,11 +350,11 @@ export function LibraryPage() {
     let nextSelectedTags = selectedTags;
     let nextExcludedTags = excludedTags;
 
-    if (selectedTags.includes(tag)) {
-      nextSelectedTags = selectedTags.filter((value) => value !== tag);
-      nextExcludedTags = excludedTags.includes(tag) ? excludedTags : [...excludedTags, tag];
-    } else if (excludedTags.includes(tag)) {
-      nextExcludedTags = excludedTags.filter((value) => value !== tag);
+    if (hasTagValue(selectedTags, tag)) {
+      nextSelectedTags = removeTagValue(selectedTags, tag);
+      nextExcludedTags = hasTagValue(excludedTags, tag) ? excludedTags : [...excludedTags, tag];
+    } else if (hasTagValue(excludedTags, tag)) {
+      nextExcludedTags = removeTagValue(excludedTags, tag);
     } else {
       nextSelectedTags = [...selectedTags, tag];
     }
@@ -502,9 +668,10 @@ export function LibraryPage() {
             onChange={(event) => setTagQuery(event.target.value)}
             aria-label="Search available tags"
           />
+          <p className="tag-cloud-help">Tag chips cycle include -&gt; exclude -&gt; off.</p>
           {filteredTagOptions.map((tagInfo) => {
-            const selected = selectedTags.includes(tagInfo.tag);
-            const excluded = excludedTags.includes(tagInfo.tag);
+            const selected = hasTagValue(selectedTags, tagInfo.tag);
+            const excluded = hasTagValue(excludedTags, tagInfo.tag);
             const className = selected ? "tag-chip selected" : excluded ? "tag-chip excluded" : "tag-chip";
             const stateLabel = selected ? "include" : excluded ? "exclude" : "off";
             return (
@@ -614,11 +781,23 @@ export function LibraryPage() {
               {story.bestChunk?.excerpt ? <blockquote>{story.bestChunk.excerpt}</blockquote> : null}
 
               <div className="tags-row">
-                {story.tags.slice(0, 8).map((tag) => (
-                  <span key={tag} className="tag-pill">
-                    {tag}
-                  </span>
-                ))}
+                {story.tags.slice(0, 8).map((tag) => {
+                  const selected = hasTagValue(selectedTags, tag);
+                  const excluded = hasTagValue(excludedTags, tag);
+                  const className = selected ? "tag-pill selected" : excluded ? "tag-pill excluded" : "tag-pill";
+                  const stateLabel = selected ? "include" : excluded ? "exclude" : "off";
+                  return (
+                    <button
+                      key={`${story.storyId}-${tag}`}
+                      type="button"
+                      className={className}
+                      onClick={() => toggleTag(tag)}
+                      title={`Tag filter: ${stateLabel}`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
                 {story.userTags.map((tag) => (
                   <button
                     key={`user-${story.storyId}-${tag}`}

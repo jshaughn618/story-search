@@ -58,6 +58,7 @@ export interface SearchResponse {
   totalCandidates?: number;
   scannedCandidates?: number;
   nextCursor?: string | null;
+  facetTags?: TagCount[];
 }
 
 export interface SearchRequest {

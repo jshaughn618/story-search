@@ -157,6 +157,7 @@ export interface IndexerConfig {
   storeOriginalBinary: boolean;
   vectorBatchMaxBytes: number;
   hashConcurrency: number;
+  storyConcurrency: number;
 }
 
 export interface ExtractorInput {

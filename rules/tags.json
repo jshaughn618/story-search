@@ -208,5 +208,103 @@
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
+  },
+  {  
+    "tag": "BBW",
+    "anyOf": ["bbw", "big beautiful woman", "big beautiful women", "big busty woman", "big busty women", "plus size woman", "plus size women"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "BDSM",
+    "anyOf": ["bdsm", "bondage", "discipline", "dominance", "submission", "sadism", "masochism"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Foot Fetish",
+    "anyOf": ["foot fetish", "foot worship", "foot play", "foot roleplay", "foot role play", "foot job", "footjob"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Latex",
+    "anyOf": ["latex", "latex clothing", "latex outfit", "latex suit", "latex dress", "latex gloves"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  }, 
+  {
+    "tag": "Doctor",
+    "anyOf": ["doctor", "doctor play", "doctor roleplay", "doctor role play", "gyno", "gyno play", "gyno roleplay", "gyno role play", "gynocologist", "gynecologist play", "gynecologist roleplay", "gynecologist role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true  
+  },
+  {
+    "tag": "Nurse",
+    "anyOf": ["nurse", "nurse play", "nurse roleplay", "nurse role play", "nursing", "nursing play", "nursing roleplay", "nursing role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true 
+  },
+  {
+    "tag": "Teacher",
+    "anyOf": ["teacher", "teacher play", "teacher roleplay", "teacher role play", "school teacher", "school teacher play", "school teacher roleplay", "school teacher role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true 
+  },
+  {
+    "tag": "Pet Play",
+    "anyOf": ["pet play", "pet roleplay", "pet role play", "puppy play", "puppy roleplay", "puppy role play", "kitten play", "kitten roleplay", "kitten role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true 
+  },
+  {
+    "tag": "Pussy Whipping",
+    "anyOf": ["pussy whipping", "pussy whip", "pussy whipped", "whip pussy", "whipped pussy", "pussy whipping play", "pussy whipping roleplay", "pussy whipping role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Cum Eating",
+    "anyOf": ["cum eating", "cum eat", "cum eaten", "cum eat play", "cum eat roleplay", "cum eat role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Sex Slave",
+    "anyOf": ["sex slave", "sex slave play", "sex slave roleplay", "sex slave role play", "slave", "slave play", "slave roleplay", "slave role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "Cunnilingus",
+    "anyOf": ["cunnilingus", "cunnilingus play", "cunnilingus roleplay", "cunnilingus role play", "cunnilingus art", "cunnilingus manga", "cunnilingus anime"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true  
+  },
+  {
+    "tag": "Facesitting",
+    "anyOf": ["facesitting", "face sitting", "face-sitting", "facesit", "face sit", "face-sit", "facesitting play", "facesitting roleplay", "facesitting role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true  
+  },
+  {
+    "tag": "Gyno",
+    "anyOf": ["gyno", "gyno play", "gyno roleplay", "gyno role play", "gynocologist", "gynecologist play", "gynecologist roleplay", "gynecologist role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true  
   }
 ]

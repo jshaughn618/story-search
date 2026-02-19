@@ -163,6 +163,48 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+class AsyncMutex {
+  private queue: Promise<void> = Promise.resolve();
+
+  async runExclusive<T>(worker: () => Promise<T>): Promise<T> {
+    const previous = this.queue;
+    let release!: () => void;
+    this.queue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    await previous;
+    try {
+      return await worker();
+    } finally {
+      release();
+    }
+  }
+}
+
+class KeyedAsyncMutex {
+  private readonly queueByKey = new Map<string, Promise<void>>();
+
+  async runExclusive<T>(key: string, worker: () => Promise<T>): Promise<T> {
+    const previous = this.queueByKey.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.queueByKey.set(key, current);
+
+    await previous;
+    try {
+      return await worker();
+    } finally {
+      release();
+      if (this.queueByKey.get(key) === current) {
+        this.queueByKey.delete(key);
+      }
+    }
+  }
+}
+
 function createInitialStatusCounts(): Record<StoryStatus, number> {
   return {
     OK: 0,
@@ -414,6 +456,8 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
 
   const vectorBatch: VectorRecord[] = [];
   let vectorBatchBytes = 0;
+  const vectorBatchMutex = new AsyncMutex();
+  const canonHashMutex = new KeyedAsyncMutex();
 
   const sourceByPath = new Map<string, ExistingSourceRow>();
   for (const source of await withTiming(profile, "d1_prefetch_sources_ms", () => client.getAllSources())) {
@@ -453,7 +497,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
     });
   }
 
-  const flushVectorBatch = async () => {
+  const flushVectorBatchUnlocked = async () => {
     if (vectorBatch.length === 0) {
       return;
     }
@@ -466,9 +510,27 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
     vectorBatchBytes = 0;
   };
 
+  const flushVectorBatch = async () =>
+    vectorBatchMutex.runExclusive(async () => {
+      await flushVectorBatchUnlocked();
+    });
+
+  const queueVector = async (vector: VectorRecord) =>
+    vectorBatchMutex.runExclusive(async () => {
+      const vectorBytes = Buffer.byteLength(JSON.stringify(vector), "utf8") + 1;
+      if (
+        vectorBatch.length >= config.vectorBatchSize ||
+        vectorBatchBytes + vectorBytes > config.vectorBatchMaxBytes
+      ) {
+        await flushVectorBatchUnlocked();
+      }
+      vectorBatch.push(vector);
+      vectorBatchBytes += vectorBytes;
+    });
+
   await fs.mkdir(config.outputTextDir, { recursive: true });
 
-  for (const filePath of files) {
+  await mapWithConcurrency(files, config.storyConcurrency, async (filePath) => {
     const relativePath = normalizePathForDb(absoluteFolder, filePath);
 
     try {
@@ -479,7 +541,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         summary.skipped += 1;
         incrementCount(profile, "skipped_unchanged");
         console.log(`- unchanged: ${relativePath}`);
-        continue;
+        return;
       }
 
       if (options.changedOnly && previousSource && !preloadedSource) {
@@ -488,7 +550,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
           summary.skipped += 1;
           incrementCount(profile, "skipped_unchanged");
           console.log(`- unchanged: ${relativePath}`);
-          continue;
+          return;
         }
       }
 
@@ -520,30 +582,138 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
           errorMessage: ingest.extractionError ?? ingest.statusNotes ?? "Extraction failed",
         });
         console.log(`! extraction failed: ${ingest.sourcePath}`);
-        continue;
+        return;
       }
 
       extractedWordCounts.push(countWords(ingest.normalizedText));
+      await canonHashMutex.runExclusive(ingest.canonHash, async () => {
+        const derivedStoryId = createStoryId(ingest.canonHash!);
+        const existingCanonical = canonicalByHash.get(ingest.canonHash!) ?? null;
+        const storyId = existingCanonical?.STORY_ID ?? derivedStoryId;
+        const ingestedAt = new Date().toISOString();
 
-      const derivedStoryId = createStoryId(ingest.canonHash);
-
-      const existingCanonical = canonicalByHash.get(ingest.canonHash) ?? null;
-      const storyId = existingCanonical?.STORY_ID ?? derivedStoryId;
-      const ingestedAt = new Date().toISOString();
-      await withTiming(profile, "local_artifact_write_ms", () =>
-        fs.writeFile(path.join(config.outputTextDir, `${storyId}.txt`), ingest.normalizedText, "utf8"),
-      );
-
-      if (config.storeOriginalBinary) {
-        const originalKey = `sources/original/${storyId}/${Buffer.from(ingest.sourcePath).toString("hex")}${path.extname(filePath).toLowerCase()}`;
-        await withTiming(profile, "r2_upload_ms", () =>
-          client.uploadRawObject(originalKey, ingest.originalBytes, getBinaryContentType(filePath)),
+        await withTiming(profile, "local_artifact_write_ms", () =>
+          fs.writeFile(path.join(config.outputTextDir, `${storyId}.txt`), ingest.normalizedText, "utf8"),
         );
-      }
 
-      if (existingCanonical && !options.reprocessExisting) {
-        await withTiming(profile, "d1_write_ms", () =>
-          client.upsertStorySource({
+        if (config.storeOriginalBinary) {
+          const originalKey = `sources/original/${storyId}/${Buffer.from(ingest.sourcePath).toString("hex")}${path.extname(filePath).toLowerCase()}`;
+          await withTiming(profile, "r2_upload_ms", () =>
+            client.uploadRawObject(originalKey, ingest.originalBytes, getBinaryContentType(filePath)),
+          );
+        }
+
+        if (existingCanonical && !options.reprocessExisting) {
+          await withTiming(profile, "d1_write_ms", () =>
+            client.upsertStorySource({
+              storyId,
+              sourcePath: ingest.sourcePath,
+              rawHash: ingest.rawHash,
+              ingestedAt,
+              sourceType: ingest.sourceType,
+              extractMethod: ingest.extractMethod,
+              titleFromSource: ingest.titleFromSource,
+            }),
+          );
+
+          if (previousSource && previousSource.STORY_ID !== storyId) {
+            await withTiming(profile, "d1_write_ms", () => client.deleteStoryIfOrphan(previousSource.STORY_ID));
+            for (const [canonHash, story] of canonicalByHash.entries()) {
+              if (story.STORY_ID === previousSource.STORY_ID) {
+                canonicalByHash.delete(canonHash);
+              }
+            }
+          }
+
+          await withTiming(profile, "d1_write_ms", () => client.refreshSourceCount(storyId));
+          sourceByPath.set(ingest.sourcePath, {
+            STORY_ID: storyId,
+            SOURCE_PATH: ingest.sourcePath,
+            RAW_HASH: ingest.rawHash,
+          });
+          summary.deduped += 1;
+          incrementCount(profile, "files_deduped");
+          console.log(`= deduped: ${ingest.sourcePath} -> ${storyId}`);
+          return;
+        }
+
+        const shouldRunAi = shouldGenerateEmbeddings(ingest.status);
+        let metadata = fallbackMetadata(ingest.sourcePath, ingest.status, ingest.statusNotes);
+        let metadataFailureNote: string | null = null;
+        if (shouldRunAi) {
+          try {
+            metadata = await withTiming(profile, "metadata_lm_ms", () =>
+              extractStoryMetadata(config, ingest.normalizedText, ingest.sourcePath),
+            );
+          } catch (metadataError) {
+            const message = metadataError instanceof Error ? metadataError.message : "unknown metadata error";
+            metadataFailureNote = `Metadata extraction fallback used: ${message}`;
+            metadata = fallbackMetadata(ingest.sourcePath, ingest.status, metadataFailureNote);
+            console.warn(`! metadata fallback: ${ingest.sourcePath} (${message})`);
+          }
+        }
+
+        const chunks = await withTiming(profile, "chunking_ms", async () =>
+          chunkText(ingest.normalizedText, {
+            chunkSizeChars: config.chunkSizeChars,
+            overlapChars: config.chunkOverlapChars,
+          }),
+        );
+
+        const r2Key = `stories/${storyId}.txt`;
+        const chunksKey = `stories/${storyId}.chunks.json`;
+
+        await withTiming(profile, "r2_upload_ms", async () => {
+          await client.uploadTextObject(r2Key, ingest.normalizedText);
+          await client.uploadJsonObject(
+            chunksKey,
+            chunks.map((chunk) => ({
+              chunkIndex: chunk.chunkIndex,
+              startChar: chunk.startChar,
+              endChar: chunk.endChar,
+              excerpt: chunk.excerpt,
+            })),
+          );
+        });
+
+        const indexedStory: IndexedStory = {
+          storyId,
+          sourcePath: ingest.sourcePath,
+          contentHash: ingest.canonHash!,
+          rawHash: ingest.rawHash,
+          canonHash: ingest.canonHash!,
+          storyStatus: ingest.status,
+          sourceCount: 1,
+          canonTextSource: ingest.sourceType,
+          extractMethod: ingest.extractMethod,
+          statusNotes: ingest.statusNotes,
+          title: metadata.title,
+          author: metadata.author,
+          summaryShort: metadata.summary_short,
+          summaryLong: metadata.summary_long,
+          genre: metadata.genre,
+          tone: metadata.tone,
+          setting: metadata.setting,
+          tags: metadata.tags,
+          themes: metadata.themes,
+          contentNotes: metadata.content_notes,
+          wordCount: countWords(ingest.normalizedText),
+          chunkCount: Math.max(0, chunks.length),
+          r2Key,
+          chunksKey,
+          updatedAt: ingestedAt,
+        };
+
+        if (metadataFailureNote) {
+          indexedStory.statusNotes = indexedStory.statusNotes
+            ? `${indexedStory.statusNotes} | ${metadataFailureNote}`
+            : metadataFailureNote;
+        }
+
+        await withTiming(profile, "d1_write_ms", async () => {
+          await client.upsertStory(indexedStory);
+          await client.replaceStoryTags(storyId, shouldRunAi ? metadata.tags : []);
+          await client.upsertStorySource({
             storyId,
             sourcePath: ingest.sourcePath,
             rawHash: ingest.rawHash,
@@ -551,8 +721,8 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
             sourceType: ingest.sourceType,
             extractMethod: ingest.extractMethod,
             titleFromSource: ingest.titleFromSource,
-          }),
-        );
+          });
+        });
 
         if (previousSource && previousSource.STORY_ID !== storyId) {
           await withTiming(profile, "d1_write_ms", () => client.deleteStoryIfOrphan(previousSource.STORY_ID));
@@ -569,167 +739,51 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
           SOURCE_PATH: ingest.sourcePath,
           RAW_HASH: ingest.rawHash,
         });
-        summary.deduped += 1;
-        incrementCount(profile, "files_deduped");
-        console.log(`= deduped: ${ingest.sourcePath} -> ${storyId}`);
-        continue;
-      }
-
-      const shouldRunAi = shouldGenerateEmbeddings(ingest.status);
-      let metadata = fallbackMetadata(ingest.sourcePath, ingest.status, ingest.statusNotes);
-      let metadataFailureNote: string | null = null;
-      if (shouldRunAi) {
-        try {
-          metadata = await withTiming(profile, "metadata_lm_ms", () =>
-            extractStoryMetadata(config, ingest.normalizedText, ingest.sourcePath),
-          );
-        } catch (metadataError) {
-          const message = metadataError instanceof Error ? metadataError.message : "unknown metadata error";
-          metadataFailureNote = `Metadata extraction fallback used: ${message}`;
-          metadata = fallbackMetadata(ingest.sourcePath, ingest.status, metadataFailureNote);
-          console.warn(`! metadata fallback: ${ingest.sourcePath} (${message})`);
-        }
-      }
-
-      const chunks = await withTiming(profile, "chunking_ms", async () =>
-        chunkText(ingest.normalizedText, {
-          chunkSizeChars: config.chunkSizeChars,
-          overlapChars: config.chunkOverlapChars,
-        }),
-      );
-
-      const r2Key = `stories/${storyId}.txt`;
-      const chunksKey = `stories/${storyId}.chunks.json`;
-
-      await withTiming(profile, "r2_upload_ms", async () => {
-        await client.uploadTextObject(r2Key, ingest.normalizedText);
-        await client.uploadJsonObject(
-          chunksKey,
-          chunks.map((chunk) => ({
-            chunkIndex: chunk.chunkIndex,
-            startChar: chunk.startChar,
-            endChar: chunk.endChar,
-            excerpt: chunk.excerpt,
-          })),
-        );
-      });
-
-      const indexedStory: IndexedStory = {
-        storyId,
-        sourcePath: ingest.sourcePath,
-        contentHash: ingest.canonHash,
-        rawHash: ingest.rawHash,
-        canonHash: ingest.canonHash,
-        storyStatus: ingest.status,
-        sourceCount: 1,
-        canonTextSource: ingest.sourceType,
-        extractMethod: ingest.extractMethod,
-        statusNotes: ingest.statusNotes,
-        title: metadata.title,
-        author: metadata.author,
-        summaryShort: metadata.summary_short,
-        summaryLong: metadata.summary_long,
-        genre: metadata.genre,
-        tone: metadata.tone,
-        setting: metadata.setting,
-        tags: metadata.tags,
-        themes: metadata.themes,
-        contentNotes: metadata.content_notes,
-        wordCount: countWords(ingest.normalizedText),
-        chunkCount: Math.max(0, chunks.length),
-        r2Key,
-        chunksKey,
-        updatedAt: ingestedAt,
-      };
-
-      if (metadataFailureNote) {
-        indexedStory.statusNotes = indexedStory.statusNotes
-          ? `${indexedStory.statusNotes} | ${metadataFailureNote}`
-          : metadataFailureNote;
-      }
-
-      await withTiming(profile, "d1_write_ms", async () => {
-        await client.upsertStory(indexedStory);
-        await client.replaceStoryTags(storyId, shouldRunAi ? metadata.tags : []);
-        await client.upsertStorySource({
-          storyId,
-          sourcePath: ingest.sourcePath,
-          rawHash: ingest.rawHash,
-          ingestedAt,
-          sourceType: ingest.sourceType,
-          extractMethod: ingest.extractMethod,
-          titleFromSource: ingest.titleFromSource,
+        canonicalByHash.set(ingest.canonHash!, {
+          STORY_ID: storyId,
+          SOURCE_PATH: ingest.sourcePath,
+          RAW_HASH: ingest.rawHash,
+          CANON_HASH: ingest.canonHash!,
+          R2_KEY: r2Key,
+          CHUNKS_KEY: chunksKey,
+          STORY_STATUS: ingest.status,
+          CHUNK_COUNT: chunks.length,
+          SOURCE_COUNT: 1,
+          TITLE: metadata.title,
+          AUTHOR: metadata.author,
         });
-      });
 
-      if (previousSource && previousSource.STORY_ID !== storyId) {
-        await withTiming(profile, "d1_write_ms", () => client.deleteStoryIfOrphan(previousSource.STORY_ID));
-        for (const [canonHash, story] of canonicalByHash.entries()) {
-          if (story.STORY_ID === previousSource.STORY_ID) {
-            canonicalByHash.delete(canonHash);
+        if (shouldRunAi) {
+          const embeddings = await withTiming(profile, "embedding_docs_ms", () =>
+            embedInBatches(
+              config,
+              chunks.map((chunk) => chunk.text),
+            ),
+          );
+
+          for (let index = 0; index < chunks.length; index += 1) {
+            const chunk = chunks[index];
+            const vector: VectorRecord = {
+              id: `${storyId}:${String(index).padStart(5, "0")}`,
+              values: embeddings[index],
+              metadata: {
+                storyId,
+                chunkIndex: chunk.chunkIndex,
+                genre: metadata.genre,
+                tone: metadata.tone,
+                title: metadata.title,
+                excerpt: chunk.excerpt,
+                storyStatus: ingest.status,
+              },
+            };
+
+            await queueVector(vector);
           }
         }
-      }
 
-      await withTiming(profile, "d1_write_ms", () => client.refreshSourceCount(storyId));
-      sourceByPath.set(ingest.sourcePath, {
-        STORY_ID: storyId,
-        SOURCE_PATH: ingest.sourcePath,
-        RAW_HASH: ingest.rawHash,
+        summary.indexed += 1;
+        console.log(`+ indexed: ${ingest.sourcePath} (${chunks.length} chunks, ${ingest.status})`);
       });
-      canonicalByHash.set(ingest.canonHash, {
-        STORY_ID: storyId,
-        SOURCE_PATH: ingest.sourcePath,
-        RAW_HASH: ingest.rawHash,
-        CANON_HASH: ingest.canonHash,
-        R2_KEY: r2Key,
-        CHUNKS_KEY: chunksKey,
-        STORY_STATUS: ingest.status,
-        CHUNK_COUNT: chunks.length,
-        SOURCE_COUNT: 1,
-        TITLE: metadata.title,
-        AUTHOR: metadata.author,
-      });
-
-      if (shouldRunAi) {
-        const embeddings = await withTiming(profile, "embedding_docs_ms", () =>
-          embedInBatches(
-            config,
-            chunks.map((chunk) => chunk.text),
-          ),
-        );
-
-        for (let index = 0; index < chunks.length; index += 1) {
-          const chunk = chunks[index];
-          const vector: VectorRecord = {
-            id: `${storyId}:${String(index).padStart(5, "0")}`,
-            values: embeddings[index],
-            metadata: {
-              storyId,
-              chunkIndex: chunk.chunkIndex,
-              genre: metadata.genre,
-              tone: metadata.tone,
-              title: metadata.title,
-              excerpt: chunk.excerpt,
-              storyStatus: ingest.status,
-            },
-          };
-
-          const vectorBytes = Buffer.byteLength(JSON.stringify(vector), "utf8") + 1;
-          if (
-            vectorBatch.length >= config.vectorBatchSize ||
-            vectorBatchBytes + vectorBytes > config.vectorBatchMaxBytes
-          ) {
-            await flushVectorBatch();
-          }
-
-          vectorBatch.push(vector);
-          vectorBatchBytes += vectorBytes;
-        }
-      }
-
-      summary.indexed += 1;
-      console.log(`+ indexed: ${ingest.sourcePath} (${chunks.length} chunks, ${ingest.status})`);
     } catch (error) {
       summary.failed += 1;
       incrementCount(profile, "files_failed_runtime");
@@ -740,7 +794,7 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       });
       console.error(`! failed: ${relativePath}`, error);
     }
-  }
+  });
 
   await flushVectorBatch();
 

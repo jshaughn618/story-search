@@ -31,6 +31,52 @@ interface AggregatedResult {
   excerpt: string;
 }
 
+interface StoryTagSource {
+  tags: string[];
+  userTags: string[];
+}
+
+interface TagFacet {
+  tag: string;
+  count: number;
+}
+
+function buildTagFacets(stories: StoryTagSource[], limit = 200): TagFacet[] {
+  const counts = new Map<string, { tag: string; count: number }>();
+
+  for (const story of stories) {
+    const perStory = new Map<string, string>();
+    for (const rawTag of [...story.tags, ...story.userTags]) {
+      const tag = rawTag.trim();
+      if (!tag) {
+        continue;
+      }
+      const normalized = tag.toLowerCase();
+      if (!perStory.has(normalized)) {
+        perStory.set(normalized, tag);
+      }
+    }
+
+    for (const [normalized, tag] of perStory.entries()) {
+      const current = counts.get(normalized);
+      if (current) {
+        current.count += 1;
+      } else {
+        counts.set(normalized, { tag, count: 1 });
+      }
+    }
+  }
+
+  return [...counts.values()]
+    .sort((a, b) => {
+      if (b.count !== a.count) {
+        return b.count - a.count;
+      }
+      return a.tag.localeCompare(b.tag);
+    })
+    .slice(0, limit);
+}
+
 
 function collectVectorMatches(bestByStory: Map<string, AggregatedResult>, matches: VectorMatch[]) {
   for (const match of matches) {
@@ -249,11 +295,13 @@ async function runBrowseQuery(env: Env, filters: Required<SearchFilters>, limit:
 
   const result = await env.STORY_DB.prepare(sql).bind(...params, limit, offset).all<StoryRow>();
   const rows = result.results ?? [];
+  const mappedItems = rows.map((row) => ({ ...mapStory(row), bestChunk: null }));
 
   return {
-    items: rows.map((row) => ({ ...mapStory(row), bestChunk: null })),
+    items: mappedItems,
     nextOffset: rows.length < limit ? null : offset + limit,
     mode: "browse" as const,
+    facetTags: buildTagFacets(mappedItems),
   };
 }
 
@@ -421,6 +469,7 @@ async function runExactQuery(
     scannedCandidates: scanned,
     nextOffset: matches.length >= limit ? dbOffset : null,
     nextCursor: hasMoreRows ? String(dbOffset) : null,
+    facetTags: buildTagFacets(matches),
   };
 }
 
@@ -528,6 +577,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       items: paged,
       totalCandidates: filtered.length,
       nextOffset: offset + limit >= filtered.length ? null : offset + limit,
+      facetTags: buildTagFacets(filtered),
     });
   } catch (error) {
     console.error("/api/search error", error);

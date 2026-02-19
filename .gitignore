@@ -8,17 +8,18 @@ dist/
 *.zip
 *.tsbuildinfo
 tools/indexer/output_text/
+indexer/output_text/
 tools/indexer/output_reports/
 tools/indexer/reports/
 tools/tagger/reports/
 
 # Keep sample fixtures tracked, ignore large corpus files.
-*.txt
+stories/**
 !sample_stories/*.txt
 !tools/indexer/prompts/system_prompt.txt
 *.doc
 *.pdf
 *.rtf
-
+*.txt
 ingest_summary.json
 *.csv

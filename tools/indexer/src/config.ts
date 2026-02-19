@@ -106,5 +106,6 @@ export function loadConfig(): IndexerConfig {
     storeOriginalBinary: asBoolean("STORE_ORIGINAL_BINARY", false),
     vectorBatchMaxBytes: asNumber("VECTOR_BATCH_MAX_BYTES", 95 * 1024 * 1024),
     hashConcurrency: asNumber("INDEXER_HASH_CONCURRENCY", 8),
+    storyConcurrency: asNumber("INDEXER_STORY_CONCURRENCY", 1),
   };
 }

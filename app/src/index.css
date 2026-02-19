@@ -153,6 +153,13 @@ a {
   gap: 0.45rem;
 }
 
+.tag-cloud-help {
+  width: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 .tag-chip {
   background: #f9f9f6;
   border-color: #aeb5b4;
@@ -304,6 +311,17 @@ a {
   border-radius: 999px;
   padding: 0.26rem 0.55rem;
   background: white;
+}
+
+.tag-pill.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.tag-pill.excluded {
+  background: #fdecec;
+  border-color: #b64a4a;
+  color: #7a2121;
 }
 
 .debug-line {
