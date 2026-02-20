@@ -150,6 +150,7 @@ export function LibraryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialUrlState = useMemo(() => parseLibraryUrlState(searchParams), [searchParams]);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const tagOrderRef = useRef<Map<string, number>>(new Map());
   const [filters, setFilters] = useState<FiltersResponse>(emptyFilters);
   const [query, setQuery] = useState(initialUrlState.query);
   const [appliedQuery, setAppliedQuery] = useState(initialUrlState.query);
@@ -187,21 +188,33 @@ export function LibraryPage() {
   const activeTagFacets = useMemo(() => {
     const source = appliedQuery.trim() ? searchTagFacets : filters.tags;
     const merged = new Map<string, FiltersResponse["tags"][number]>();
+    const order = tagOrderRef.current;
+
+    const trackOrder = (tag: string) => {
+      const normalized = tag.toLowerCase();
+      if (!order.has(normalized)) {
+        order.set(normalized, order.size);
+      }
+      return normalized;
+    };
 
     for (const tagInfo of source) {
-      merged.set(tagInfo.tag.toLowerCase(), tagInfo);
+      const key = trackOrder(tagInfo.tag);
+      merged.set(key, tagInfo);
     }
 
     for (const tag of [...selectedTags, ...excludedTags]) {
-      const key = tag.toLowerCase();
+      const key = trackOrder(tag);
       if (!merged.has(key)) {
         merged.set(key, { tag, count: 0 });
       }
     }
 
     return [...merged.values()].sort((a, b) => {
-      if (b.count !== a.count) {
-        return b.count - a.count;
+      const indexA = order.get(a.tag.toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+      const indexB = order.get(b.tag.toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+      if (indexA !== indexB) {
+        return indexA - indexB;
       }
       return a.tag.localeCompare(b.tag);
     });
@@ -212,7 +225,7 @@ export function LibraryPage() {
     if (trimmed.length > 0) {
       return activeTagFacets.filter((tagInfo) => tagInfo.tag.toLowerCase().includes(trimmed));
     }
-    return activeTagFacets.slice(0, 60);
+    return activeTagFacets;
   }, [activeTagFacets, tagQuery]);
 
   const currentFilterParams = () => ({
@@ -705,7 +718,7 @@ export function LibraryPage() {
         {results.length === 0 && !loading ? <p>No stories matched this query.</p> : null}
 
         {results.map((story) => {
-          const chunkQuery = story.bestChunk ? `?chunk=${story.bestChunk.chunkIndex}` : "";
+          const chunkQuery = mode === "exact" && story.bestChunk ? `?chunk=${story.bestChunk.chunkIndex}` : "";
           const menuOpen = openMenuStoryId === story.storyId;
           const deleting = deletingStoryId === story.storyId;
           const metaParts = [

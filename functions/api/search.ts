@@ -142,15 +142,33 @@ function normalizeStatuses(statuses?: StoryStatus[]): StoryStatus[] {
 function normalizeFilters(filters?: SearchFilters): Required<SearchFilters> {
   const genre = filters?.genre?.trim() || null;
   const tone = filters?.tone?.trim() || null;
-  const tags = Array.isArray(filters?.tags)
+  const rawTags = Array.isArray(filters?.tags)
     ? filters.tags.map((tag) => tag.trim()).filter(Boolean)
     : [];
+  const seenSelected = new Set<string>();
+  const tags: string[] = [];
+  for (const tag of rawTags) {
+    const normalized = tag.toLowerCase();
+    if (!seenSelected.has(normalized)) {
+      seenSelected.add(normalized);
+      tags.push(tag);
+    }
+  }
   const selectedLower = new Set(tags.map((tag) => tag.toLowerCase()));
-  const excludedTags = Array.isArray(filters?.excludedTags)
+  const rawExcludedTags = Array.isArray(filters?.excludedTags)
     ? filters.excludedTags
         .map((tag) => tag.trim())
         .filter((tag) => Boolean(tag) && !selectedLower.has(tag.toLowerCase()))
     : [];
+  const seenExcluded = new Set<string>();
+  const excludedTags: string[] = [];
+  for (const tag of rawExcludedTags) {
+    const normalized = tag.toLowerCase();
+    if (!seenExcluded.has(normalized)) {
+      seenExcluded.add(normalized);
+      excludedTags.push(tag);
+    }
+  }
   const statuses = normalizeStatuses(filters?.statuses);
   const hideRead = filters?.hideRead === true;
 
