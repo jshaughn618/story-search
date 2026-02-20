@@ -41,6 +41,22 @@ interface TagFacet {
   count: number;
 }
 
+interface FilterClauseOptions {
+  storyIdColumn: string;
+  genreColumn: string;
+  toneColumn: string;
+  statusColumn: string;
+  isReadColumn: string;
+}
+
+const DEFAULT_FILTER_CLAUSE_OPTIONS: FilterClauseOptions = {
+  storyIdColumn: "STORY_ID",
+  genreColumn: "GENRE",
+  toneColumn: "TONE",
+  statusColumn: "STORY_STATUS",
+  isReadColumn: "IS_READ",
+};
+
 function buildTagFacets(stories: StoryTagSource[], limit = 200): TagFacet[] {
   const counts = new Map<string, { tag: string; count: number }>();
 
@@ -194,6 +210,74 @@ function buildSnippet(text: string, startIndex: number, matchLength: number): st
     .trim();
 }
 
+function isMissingTableError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes("no such table");
+}
+
+function parseExactCursorOffset(cursor: string | null | undefined): number {
+  if (!cursor) {
+    return 0;
+  }
+
+  if (cursor.startsWith("fts:")) {
+    const value = Number.parseInt(cursor.slice(4), 10);
+    return Number.isNaN(value) || value < 0 ? 0 : value;
+  }
+
+  if (cursor.startsWith("scan:")) {
+    const value = Number.parseInt(cursor.slice(5), 10);
+    return Number.isNaN(value) || value < 0 ? 0 : value;
+  }
+
+  const legacyValue = Number.parseInt(cursor, 10);
+  return Number.isNaN(legacyValue) || legacyValue < 0 ? 0 : legacyValue;
+}
+
+function buildFtsMatchQuery(parsedExact: ExactQuery): string {
+  const escape = (value: string) => value.replace(/"/g, "\"\"");
+  const parts = [`"${escape(parsedExact.exactTerm)}"`];
+  for (const term of parsedExact.extraTerms) {
+    if (term.trim()) {
+      parts.push(`"${escape(term.trim())}"`);
+    }
+  }
+  return parts.join(" AND ");
+}
+
+function stripSnippetMarkers(value: string): string {
+  return value
+    .replace(/\[\[/g, "")
+    .replace(/\]\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function upsertStoryTextCache(env: Env, storyId: string, text: string): Promise<void> {
+  try {
+    await env.STORY_DB.prepare(
+      `
+      INSERT INTO STORY_TEXT (STORY_ID, TEXT_CONTENT, UPDATED_AT)
+      VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(STORY_ID) DO UPDATE SET
+        TEXT_CONTENT = excluded.TEXT_CONTENT,
+        UPDATED_AT = excluded.UPDATED_AT
+      `,
+    )
+      .bind(storyId, text)
+      .run();
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return;
+    }
+    console.warn("Could not cache story text in D1", error);
+  }
+}
+
 function normalizeOffset(offset?: number): number {
   if (!offset || Number.isNaN(offset) || offset < 0) {
     return 0;
@@ -309,20 +393,23 @@ function applyFilterClauses(
   filters: Required<SearchFilters>,
   clauses: string[],
   params: (string | number)[],
+  options: FilterClauseOptions = DEFAULT_FILTER_CLAUSE_OPTIONS,
 ) {
+  const storyIdColumn = options.storyIdColumn;
+
   if (filters.genre) {
-    clauses.push("GENRE = ?");
+    clauses.push(`${options.genreColumn} = ?`);
     params.push(filters.genre);
   }
 
   if (filters.tone) {
-    clauses.push("TONE = ?");
+    clauses.push(`${options.toneColumn} = ?`);
     params.push(filters.tone);
   }
 
   if (filters.statuses.length > 0) {
     const statusPlaceholders = filters.statuses.map(() => "?").join(",");
-    clauses.push(`STORY_STATUS IN (${statusPlaceholders})`);
+    clauses.push(`${options.statusColumn} IN (${statusPlaceholders})`);
     params.push(...filters.statuses);
   }
 
@@ -330,7 +417,7 @@ function applyFilterClauses(
     const normalizedTags = filters.tags.map((tag) => tag.toLowerCase());
     const tagPlaceholders = normalizedTags.map(() => "?").join(",");
     clauses.push(`
-      STORY_ID IN (
+      ${storyIdColumn} IN (
         SELECT STORY_ID
         FROM (
           SELECT s.STORY_ID AS STORY_ID, LOWER(TRIM(j.value)) AS TAG
@@ -351,7 +438,7 @@ function applyFilterClauses(
     const normalizedExcludedTags = filters.excludedTags.map((tag) => tag.toLowerCase());
     const excludedTagPlaceholders = normalizedExcludedTags.map(() => "?").join(",");
     clauses.push(`
-      STORY_ID NOT IN (
+      ${storyIdColumn} NOT IN (
         SELECT STORY_ID
         FROM (
           SELECT s.STORY_ID AS STORY_ID, LOWER(TRIM(j.value)) AS TAG
@@ -367,11 +454,11 @@ function applyFilterClauses(
   }
 
   if (filters.hideRead) {
-    clauses.push("IS_READ = 0");
+    clauses.push(`${options.isReadColumn} = 0`);
   }
 }
 
-async function runExactQuery(
+async function runExactQueryLegacy(
   env: Env,
   parsedExact: ExactQuery,
   filters: Required<SearchFilters>,
@@ -395,7 +482,7 @@ async function runExactQuery(
     LIMIT ? OFFSET ?
   `;
 
-  let dbOffset = Math.max(0, Number.parseInt(cursor ?? "0", 10) || 0);
+  let dbOffset = parseExactCursorOffset(cursor);
   const matches: Array<ReturnType<typeof mapStory> & {
     bestChunk: { chunkIndex: number; score: number; excerpt: string } | null;
   }> = [];
@@ -424,6 +511,7 @@ async function runExactQuery(
       }
 
       const text = await textObject.text();
+      await upsertStoryTextCache(env, row.STORY_ID, text);
       const startIndex = text.indexOf(exactTerm);
       if (startIndex < 0) {
         if (scanned >= EXACT_SCAN_MAX_CANDIDATES) {
@@ -468,9 +556,97 @@ async function runExactQuery(
     totalCandidates: undefined,
     scannedCandidates: scanned,
     nextOffset: matches.length >= limit ? dbOffset : null,
-    nextCursor: hasMoreRows ? String(dbOffset) : null,
+    nextCursor: hasMoreRows ? `scan:${String(dbOffset)}` : null,
     facetTags: buildTagFacets(matches),
   };
+}
+
+interface ExactFtsRow extends StoryRow {
+  MATCH_SNIPPET: string | null;
+}
+
+async function runExactQueryFts(
+  env: Env,
+  parsedExact: ExactQuery,
+  filters: Required<SearchFilters>,
+  limit: number,
+  cursor: string | null | undefined,
+) {
+  const clauses: string[] = [];
+  const params: (string | number)[] = [buildFtsMatchQuery(parsedExact)];
+  applyFilterClauses(filters, clauses, params, {
+    storyIdColumn: "s.STORY_ID",
+    genreColumn: "s.GENRE",
+    toneColumn: "s.TONE",
+    statusColumn: "s.STORY_STATUS",
+    isReadColumn: "s.IS_READ",
+  });
+
+  const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
+  const sql = `
+    SELECT
+      s.STORY_ID, s.TITLE, s.AUTHOR, s.SUMMARY_SHORT, s.SUMMARY_LONG, s.GENRE, s.TONE, s.SETTING,
+      s.TAGS_JSON, s.USER_TAGS_JSON, s.THEMES_JSON, s.WORD_COUNT, s.R2_KEY, s.CHUNKS_KEY, s.UPDATED_AT,
+      s.STORY_STATUS, s.SOURCE_COUNT, s.STATUS_NOTES, s.IS_READ,
+      snippet(STORY_TEXT_FTS, 1, '[[', ']]', ' … ', 24) AS MATCH_SNIPPET
+    FROM STORY_TEXT_FTS
+    JOIN STORY_TEXT st ON st.rowid = STORY_TEXT_FTS.rowid
+    JOIN STORIES s ON s.STORY_ID = st.STORY_ID
+    WHERE STORY_TEXT_FTS MATCH ?
+    ${whereClause}
+    ORDER BY bm25(STORY_TEXT_FTS) ASC, s.UPDATED_AT DESC
+    LIMIT ? OFFSET ?
+  `;
+
+  const ftsOffset = parseExactCursorOffset(cursor);
+  const result = await env.STORY_DB.prepare(sql).bind(...params, limit, ftsOffset).all<ExactFtsRow>();
+  const rows = result.results ?? [];
+
+  const items = rows.map((row) => ({
+    ...mapStory(row),
+    bestChunk: {
+      chunkIndex: 0,
+      score: 1,
+      excerpt: stripSnippetMarkers(row.MATCH_SNIPPET ?? row.SUMMARY_SHORT ?? ""),
+    },
+  }));
+
+  const nextOffset = rows.length < limit ? null : ftsOffset + rows.length;
+
+  return {
+    mode: "exact" as const,
+    items,
+    totalCandidates: undefined,
+    scannedCandidates: undefined,
+    nextOffset,
+    nextCursor: nextOffset === null ? null : `fts:${String(nextOffset)}`,
+    facetTags: buildTagFacets(items),
+  };
+}
+
+async function runExactQuery(
+  env: Env,
+  parsedExact: ExactQuery,
+  filters: Required<SearchFilters>,
+  limit: number,
+  cursor: string | null | undefined,
+) {
+  if (cursor?.startsWith("scan:")) {
+    return runExactQueryLegacy(env, parsedExact, filters, limit, cursor);
+  }
+
+  try {
+    const ftsResponse = await runExactQueryFts(env, parsedExact, filters, limit, cursor);
+    if (ftsResponse.items.length > 0 || cursor?.startsWith("fts:")) {
+      return ftsResponse;
+    }
+    return runExactQueryLegacy(env, parsedExact, filters, limit, cursor);
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return runExactQueryLegacy(env, parsedExact, filters, limit, cursor);
+    }
+    throw error;
+  }
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {

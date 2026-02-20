@@ -123,6 +123,7 @@ Migrations:
 - `db/migrations/0005_chunk_count_hardening.sql`
 - `db/migrations/0006_user_tags_and_read.sql`
 - `db/migrations/0007_tagger_audit_columns.sql`
+- `db/migrations/0008_exact_search_fts.sql`
 
 `STORIES` includes:
 - `RAW_HASH`
@@ -143,6 +144,10 @@ Migrations:
 - `EXTRACT_METHOD`
 - `RAW_HASH`
 - `INGESTED_AT`
+
+`STORY_TEXT` + `STORY_TEXT_FTS`:
+- stores canonical plain text for D1 full-text exact phrase search
+- populated by indexer writes for newly processed stories
 
 `STORY_USER_TAGS` includes:
 - `STORY_ID`

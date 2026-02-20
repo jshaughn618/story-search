@@ -306,5 +306,40 @@
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true  
+  },
+  {
+    "tag": "Masturbation",
+    "anyOf": ["masturbation", "masturbate", "masturbating", "masturbated", "masturbation play", "masturbation roleplay", "masturbation role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true  
+  },
+  {
+    "tag": "Orgy",
+    "anyOf": ["orgy", "orgies", "orgy play", "orgy roleplay", "orgy role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true  
+  },
+  {
+    "tag": "Creampie",
+    "anyOf": ["creampie", "creampied", "creampies", "creampie play", "creampie roleplay", "creampie role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true  
+  },
+  {
+    "tag": "Double Penetration",
+    "anyOf": ["double penetration", "double penetration play", "double penetration roleplay", "double penetration role play", "dp", "dp play", "dp roleplay", "dp role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true  
+  },
+  {
+    "tag": "Threesome",
+    "anyOf": ["threesome", "threesomes", "threesome play", "threesome roleplay", "threesome role play"],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true  
   }
 ]

@@ -405,6 +405,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
     await runDeleteIfTableExists(env, "DELETE FROM STORY_SOURCES WHERE STORY_ID = ?", storyId);
     await runDeleteIfTableExists(env, "DELETE FROM STORY_TAGS WHERE STORY_ID = ?", storyId);
     await runDeleteIfTableExists(env, "DELETE FROM STORY_USER_TAGS WHERE STORY_ID = ?", storyId);
+    await runDeleteIfTableExists(env, "DELETE FROM STORY_TEXT WHERE STORY_ID = ?", storyId);
     await env.STORY_DB.prepare("DELETE FROM STORIES WHERE STORY_ID = ?").bind(storyId).run();
     await env.STORY_DB.prepare("DELETE FROM TAGS WHERE TAG NOT IN (SELECT DISTINCT TAG FROM STORY_TAGS)").run();
     try {

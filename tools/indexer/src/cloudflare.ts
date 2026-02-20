@@ -127,6 +127,26 @@ export class CloudflareClient {
     await this.d1Query(sql, params);
   }
 
+  async upsertStoryText(storyId: string, textContent: string, updatedAt: string) {
+    try {
+      await this.d1Exec(
+        `
+        INSERT INTO STORY_TEXT (STORY_ID, TEXT_CONTENT, UPDATED_AT)
+        VALUES (?, ?, ?)
+        ON CONFLICT(STORY_ID) DO UPDATE SET
+          TEXT_CONTENT = excluded.TEXT_CONTENT,
+          UPDATED_AT = excluded.UPDATED_AT
+        `,
+        [storyId, textContent, updatedAt],
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message.toLowerCase().includes("no such table")) {
+        return;
+      }
+      throw error;
+    }
+  }
+
   async getSetting(key: string): Promise<string | null> {
     const rows = await this.d1Query<{ VALUE: string }>(
       "SELECT VALUE FROM SETTINGS WHERE KEY = ? LIMIT 1",

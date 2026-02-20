@@ -604,17 +604,20 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
         }
 
         if (existingCanonical && !options.reprocessExisting) {
-          await withTiming(profile, "d1_write_ms", () =>
-            client.upsertStorySource({
-              storyId,
-              sourcePath: ingest.sourcePath,
-              rawHash: ingest.rawHash,
-              ingestedAt,
-              sourceType: ingest.sourceType,
-              extractMethod: ingest.extractMethod,
-              titleFromSource: ingest.titleFromSource,
-            }),
-          );
+          await withTiming(profile, "d1_write_ms", async () => {
+            await Promise.all([
+              client.upsertStoryText(storyId, ingest.normalizedText, ingestedAt),
+              client.upsertStorySource({
+                storyId,
+                sourcePath: ingest.sourcePath,
+                rawHash: ingest.rawHash,
+                ingestedAt,
+                sourceType: ingest.sourceType,
+                extractMethod: ingest.extractMethod,
+                titleFromSource: ingest.titleFromSource,
+              }),
+            ]);
+          });
 
           if (previousSource && previousSource.STORY_ID !== storyId) {
             await withTiming(profile, "d1_write_ms", () => client.deleteStoryIfOrphan(previousSource.STORY_ID));
@@ -712,16 +715,19 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
 
         await withTiming(profile, "d1_write_ms", async () => {
           await client.upsertStory(indexedStory);
-          await client.replaceStoryTags(storyId, shouldRunAi ? metadata.tags : []);
-          await client.upsertStorySource({
-            storyId,
-            sourcePath: ingest.sourcePath,
-            rawHash: ingest.rawHash,
-            ingestedAt,
-            sourceType: ingest.sourceType,
-            extractMethod: ingest.extractMethod,
-            titleFromSource: ingest.titleFromSource,
-          });
+          await Promise.all([
+            client.upsertStoryText(storyId, ingest.normalizedText, ingestedAt),
+            client.replaceStoryTags(storyId, shouldRunAi ? metadata.tags : []),
+            client.upsertStorySource({
+              storyId,
+              sourcePath: ingest.sourcePath,
+              rawHash: ingest.rawHash,
+              ingestedAt,
+              sourceType: ingest.sourceType,
+              extractMethod: ingest.extractMethod,
+              titleFromSource: ingest.titleFromSource,
+            }),
+          ]);
         });
 
         if (previousSource && previousSource.STORY_ID !== storyId) {
