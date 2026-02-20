@@ -124,6 +124,7 @@ Migrations:
 - `db/migrations/0006_user_tags_and_read.sql`
 - `db/migrations/0007_tagger_audit_columns.sql`
 - `db/migrations/0008_exact_search_fts.sql`
+- `db/migrations/0009_story_text_fts_trigger_hardening.sql`
 
 `STORIES` includes:
 - `RAW_HASH`

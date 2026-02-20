@@ -922,8 +922,12 @@ export async function runStoryTextBackfill(
           return;
         }
 
-        await client.upsertStoryText(candidate.storyId, text, new Date().toISOString());
-        summary.backfilled += 1;
+        const stored = await client.upsertStoryText(candidate.storyId, text, new Date().toISOString());
+        if (stored) {
+          summary.backfilled += 1;
+        } else {
+          summary.failed += 1;
+        }
       } catch (error) {
         summary.failed += 1;
         const message = error instanceof Error ? error.message : "unknown error";

@@ -39,6 +39,31 @@ interface StoryTextBackfillQueryRow {
 
 const CF_REQUEST_MAX_RETRIES = 4;
 const CF_REQUEST_TIMEOUT_MS = 30_000;
+const STORY_TEXT_MAX_BYTES = 1_800_000;
+
+function sanitizeStoryText(value: string): string {
+  return Buffer.from(
+    value
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ""),
+    "utf8",
+  ).toString("utf8");
+}
+
+function trimToUtf8Bytes(value: string, maxBytes: number): string {
+  const buffer = Buffer.from(value, "utf8");
+  if (buffer.byteLength <= maxBytes) {
+    return value;
+  }
+
+  const trimmed = buffer.subarray(0, maxBytes).toString("utf8");
+  return trimmed.replace(/\uFFFD+$/g, "").trimEnd();
+}
+
+function isSqlLogicError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("SQL logic error: SQLITE_ERROR");
+}
 
 export class CloudflareClient {
   private readonly s3: S3Client;
@@ -132,9 +157,9 @@ export class CloudflareClient {
     await this.d1Query(sql, params);
   }
 
-  async upsertStoryText(storyId: string, textContent: string, updatedAt: string) {
-    try {
-      await this.d1Exec(
+  async upsertStoryText(storyId: string, textContent: string, updatedAt: string): Promise<boolean> {
+    const runUpsert = async (content: string) =>
+      this.d1Exec(
         `
         INSERT INTO STORY_TEXT (STORY_ID, TEXT_CONTENT, UPDATED_AT)
         VALUES (?, ?, ?)
@@ -142,13 +167,40 @@ export class CloudflareClient {
           TEXT_CONTENT = excluded.TEXT_CONTENT,
           UPDATED_AT = excluded.UPDATED_AT
         `,
-        [storyId, textContent, updatedAt],
+        [storyId, content, updatedAt],
       );
+
+    const sanitized = sanitizeStoryText(textContent);
+    const preferred = trimToUtf8Bytes(sanitized, STORY_TEXT_MAX_BYTES);
+
+    try {
+      await runUpsert(preferred);
+      return true;
     } catch (error) {
       if (error instanceof Error && error.message.toLowerCase().includes("no such table")) {
-        return;
+        return false;
       }
-      throw error;
+      if (!isSqlLogicError(error)) {
+        throw error;
+      }
+      const fallback = trimToUtf8Bytes(preferred, 900_000);
+      if (!fallback) {
+        console.warn(`! story text skipped (empty after sanitization): ${storyId}`);
+        return false;
+      }
+      try {
+        await runUpsert(fallback);
+        console.warn(
+          `! story text stored with fallback truncation: ${storyId} (${Buffer.byteLength(preferred, "utf8")} -> ${Buffer.byteLength(fallback, "utf8")} bytes)`,
+        );
+        return true;
+      } catch (fallbackError) {
+        if (isSqlLogicError(fallbackError)) {
+          console.warn(`! story text skipped after SQL logic error: ${storyId}`);
+          return false;
+        }
+        throw fallbackError;
+      }
     }
   }
 
