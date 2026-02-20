@@ -45,6 +45,20 @@ interface RunSummary {
   };
 }
 
+interface StoryTextBackfillOptions {
+  batchSize: number;
+  concurrency: number;
+  limit: number | null;
+  includeExisting: boolean;
+}
+
+interface StoryTextBackfillSummary {
+  scanned: number;
+  backfilled: number;
+  missingR2: number;
+  failed: number;
+}
+
 interface ProfileStats {
   enabled: boolean;
   timingsMs: Record<string, number>;
@@ -852,6 +866,79 @@ export async function runIndexing(config: IndexerConfig, folder: string, options
       ),
       counts: profile.counts,
     };
+  }
+
+  return summary;
+}
+
+export async function runStoryTextBackfill(
+  config: IndexerConfig,
+  options: StoryTextBackfillOptions,
+): Promise<StoryTextBackfillSummary> {
+  const client = new CloudflareClient(config);
+  const summary: StoryTextBackfillSummary = {
+    scanned: 0,
+    backfilled: 0,
+    missingR2: 0,
+    failed: 0,
+  };
+
+  const batchSize = Math.max(1, Math.trunc(options.batchSize));
+  const concurrency = Math.max(1, Math.trunc(options.concurrency));
+  let lastStoryId: string | null = null;
+  let remaining = options.limit !== null ? Math.max(0, Math.trunc(options.limit)) : null;
+
+  while (remaining === null || remaining > 0) {
+    const queryLimit = remaining === null ? batchSize : Math.min(batchSize, remaining);
+
+    let candidates: Array<{ storyId: string; r2Key: string }>;
+    try {
+      candidates = await client.getStoryTextBackfillCandidates(
+        lastStoryId,
+        queryLimit,
+        !options.includeExisting,
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message.toLowerCase().includes("no such table")) {
+        throw new Error(
+          "STORY_TEXT table is missing. Apply latest D1 migrations before running backfill.",
+        );
+      }
+      throw error;
+    }
+
+    if (candidates.length === 0) {
+      break;
+    }
+
+    summary.scanned += candidates.length;
+
+    await mapWithConcurrency(candidates, concurrency, async (candidate) => {
+      try {
+        const text = await client.downloadTextObject(candidate.r2Key);
+        if (!text) {
+          summary.missingR2 += 1;
+          console.warn(`! missing R2 text: ${candidate.storyId} (${candidate.r2Key})`);
+          return;
+        }
+
+        await client.upsertStoryText(candidate.storyId, text, new Date().toISOString());
+        summary.backfilled += 1;
+      } catch (error) {
+        summary.failed += 1;
+        const message = error instanceof Error ? error.message : "unknown error";
+        console.warn(`! backfill failed: ${candidate.storyId} (${message})`);
+      }
+    });
+
+    lastStoryId = candidates[candidates.length - 1].storyId;
+    if (remaining !== null) {
+      remaining -= candidates.length;
+    }
+
+    console.log(
+      `- backfill progress: scanned=${summary.scanned}, backfilled=${summary.backfilled}, missingR2=${summary.missingR2}, failed=${summary.failed}`,
+    );
   }
 
   return summary;

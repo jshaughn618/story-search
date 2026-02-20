@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { Command } from "commander";
 import { loadConfig } from "./config.js";
-import { printStatus, runIndexing } from "./indexer.js";
+import { printStatus, runIndexing, runStoryTextBackfill } from "./indexer.js";
 
 function findUp(startDir: string, targetFile: string): string | null {
   let current = path.resolve(startDir);
@@ -81,6 +81,14 @@ function resolveInputFolder(folder: string, envPath: string | null): string {
   throw new Error(`Input folder not found: ${folder}`);
 }
 
+function toPositiveInt(value: string, field: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    throw new Error(`${field} must be a positive integer`);
+  }
+  return parsed;
+}
+
 const loadedEnvPath = loadEnvFile();
 
 const program = new Command();
@@ -125,6 +133,30 @@ program
   .action(async () => {
     const config = loadConfig();
     await printStatus(config);
+  });
+
+program
+  .command("backfill-text")
+  .description("Backfill STORY_TEXT / FTS rows from canonical R2 story objects")
+  .option("--batch-size <n>", "Number of story rows fetched from D1 per pass", "200")
+  .option("--concurrency <n>", "Concurrent R2 reads + D1 upserts", "8")
+  .option("--limit <n>", "Optional max stories to process")
+  .option("--include-existing", "Re-write text for stories already present in STORY_TEXT", false)
+  .action(async (options: {
+    batchSize?: string;
+    concurrency?: string;
+    limit?: string;
+    includeExisting?: boolean;
+  }) => {
+    const config = loadConfig();
+    const summary = await runStoryTextBackfill(config, {
+      batchSize: toPositiveInt(options.batchSize ?? "200", "batch-size"),
+      concurrency: toPositiveInt(options.concurrency ?? "8", "concurrency"),
+      limit: options.limit ? toPositiveInt(options.limit, "limit") : null,
+      includeExisting: options.includeExisting === true,
+    });
+    console.log("\nBackfill complete");
+    console.log(JSON.stringify(summary, null, 2));
   });
 
 program.parseAsync().catch((error: unknown) => {

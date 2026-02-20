@@ -243,6 +243,8 @@ npm run start -w tools/indexer -- index ./sample_stories --full
 npm run start -w tools/indexer -- index ./sample_stories --metadata-fallback-only
 npm run start -w tools/indexer -- index ./sample_stories --full --force-reindex
 npm run start -w tools/indexer -- status
+npm run start -w tools/indexer -- backfill-text
+npm run start -w tools/indexer -- backfill-text --concurrency 8 --batch-size 200
 npm run start -w tools/tagger -- apply --rules rules/tags.json --source tools/indexer/output_text --dry-run
 npm run start -w tools/tagger -- apply --rules rules/tags.json --source tools/indexer/output_text
 ```
@@ -253,6 +255,7 @@ Notes:
 - LM Studio system prompt content is loaded from `tools/indexer/prompts/system_prompt.txt` by default.
 - To process multiple stories in parallel, increase `INDEXER_STORY_CONCURRENCY` (for example `2`).
 - `--metadata-fallback-only` implies reprocessing mode and targets only files tied to stories where `STATUS_NOTES` contains a prior metadata fallback marker.
+- `backfill-text` populates D1 `STORY_TEXT`/FTS for existing stories without re-running metadata or embeddings.
 
 ### 6) Run locally
 

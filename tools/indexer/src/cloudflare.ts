@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type {
   DuplicateGroupRow,
   ExistingSourceRow,
@@ -30,6 +30,11 @@ interface DuplicateGroupQueryRow {
   SOURCE_COUNT: number;
   TITLE: string;
   SAMPLE_SOURCE_PATHS: string;
+}
+
+interface StoryTextBackfillQueryRow {
+  STORY_ID: string;
+  R2_KEY: string;
 }
 
 const CF_REQUEST_MAX_RETRIES = 4;
@@ -145,6 +150,36 @@ export class CloudflareClient {
       }
       throw error;
     }
+  }
+
+  async getStoryTextBackfillCandidates(
+    lastStoryId: string | null,
+    limit: number,
+    onlyMissing: boolean,
+  ): Promise<Array<{ storyId: string; r2Key: string }>> {
+    const whereClauses = ["s.STORY_ID > ?"];
+    const params: Array<string | number | null> = [lastStoryId ?? ""];
+
+    if (onlyMissing) {
+      whereClauses.push("st.STORY_ID IS NULL");
+    }
+
+    const rows = await this.d1Query<StoryTextBackfillQueryRow>(
+      `
+      SELECT s.STORY_ID, s.R2_KEY
+      FROM STORIES s
+      LEFT JOIN STORY_TEXT st ON st.STORY_ID = s.STORY_ID
+      WHERE ${whereClauses.join(" AND ")}
+      ORDER BY s.STORY_ID ASC
+      LIMIT ?
+      `,
+      [...params, limit],
+    );
+
+    return rows.map((row) => ({
+      storyId: row.STORY_ID,
+      r2Key: row.R2_KEY,
+    }));
   }
 
   async getSetting(key: string): Promise<string | null> {
@@ -339,6 +374,35 @@ export class CloudflareClient {
         ContentType: "text/plain; charset=utf-8",
       }),
     );
+  }
+
+  async downloadTextObject(key: string): Promise<string | null> {
+    const response = await this.s3.send(
+      new GetObjectCommand({
+        Bucket: this.config.r2BucketName,
+        Key: key,
+      }),
+    );
+
+    const body = response.Body;
+    if (!body) {
+      return null;
+    }
+
+    if ("transformToString" in body && typeof body.transformToString === "function") {
+      return body.transformToString();
+    }
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of body as AsyncIterable<Uint8Array | string>) {
+      if (typeof chunk === "string") {
+        chunks.push(Buffer.from(chunk));
+      } else {
+        chunks.push(Buffer.from(chunk));
+      }
+    }
+
+    return Buffer.concat(chunks).toString("utf8");
   }
 
   async uploadRawObject(key: string, content: Buffer, contentType: string) {
