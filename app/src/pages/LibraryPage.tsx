@@ -145,6 +145,27 @@ function removeTagValue(values: string[], tag: string): string[] {
   return values.filter((value) => value.toLowerCase() !== normalized);
 }
 
+function storyMatchesTagFilters(
+  story: StoryResult,
+  selectedTagFilters: string[],
+  excludedTagFilters: string[],
+): boolean {
+  const tagSet = new Set(
+    [...story.tags, ...story.userTags]
+      .map((tag) => tag.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  if (
+    selectedTagFilters.length > 0 &&
+    !selectedTagFilters.every((tag) => tagSet.has(tag.trim().toLowerCase()))
+  ) {
+    return false;
+  }
+
+  return !excludedTagFilters.some((tag) => tagSet.has(tag.trim().toLowerCase()));
+}
+
 export function LibraryPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -300,6 +321,13 @@ export function LibraryPage() {
           nextOffset: rollingCursor ? next + PAGE_SIZE : null,
         };
       }
+
+      response = {
+        ...response,
+        items: response.items.filter((story) =>
+          storyMatchesTagFilters(story, tagsToUse, excludedTagsToUse),
+        ),
+      };
 
       if (requestId === activeSearchRequestRef.current) {
         setResults(response.items);
@@ -738,6 +766,18 @@ export function LibraryPage() {
             `${story.wordCount} words`,
             story.storyStatus,
           ].filter((value): value is string => Boolean(value));
+          const visibleStoryTags = story.tags.slice(0, 8);
+          const visibleTagSet = new Set(visibleStoryTags.map((tag) => tag.toLowerCase()));
+          for (const tag of story.tags) {
+            if (
+              (hasTagValue(selectedTags, tag) || hasTagValue(excludedTags, tag)) &&
+              !visibleTagSet.has(tag.toLowerCase())
+            ) {
+              visibleStoryTags.push(tag);
+              visibleTagSet.add(tag.toLowerCase());
+            }
+          }
+
           return (
             <article key={story.storyId} className="story-card">
               <header className="story-head">
@@ -803,7 +843,7 @@ export function LibraryPage() {
               {story.bestChunk?.excerpt ? <blockquote>{story.bestChunk.excerpt}</blockquote> : null}
 
               <div className="tags-row">
-                {story.tags.slice(0, 8).map((tag) => {
+                {visibleStoryTags.map((tag) => {
                   const selected = hasTagValue(selectedTags, tag);
                   const excluded = hasTagValue(excludedTags, tag);
                   const className = selected ? "tag-pill selected" : excluded ? "tag-pill excluded" : "tag-pill";
