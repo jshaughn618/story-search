@@ -178,6 +178,7 @@ export function LibraryPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const activeSearchRequestRef = useRef(0);
 
   const activeFilters = useMemo(() => {
     const statusActive = statusFilter === "ALL" ? 0 : 1;
@@ -243,6 +244,8 @@ export function LibraryPage() {
     cursor: string | null = null,
     overrides?: { tags?: string[]; excludedTags?: string[]; hideRead?: boolean },
   ) => {
+    const requestId = activeSearchRequestRef.current + 1;
+    activeSearchRequestRef.current = requestId;
     setLoading(true);
     setError(null);
 
@@ -298,41 +301,47 @@ export function LibraryPage() {
         };
       }
 
-      setResults(response.items);
-      setMode(response.mode);
-      setOffset(next);
-      setNextOffset(response.nextOffset);
-      setTotalCandidates(response.totalCandidates);
-      setAppliedQuery(queryToUse);
-      setSearchTagFacets(queryToUse.trim() ? response.facetTags ?? [] : []);
-      if (response.mode === "exact") {
-        setExactCursor(cursor);
-        setExactNextCursor(response.nextCursor ?? null);
-      } else {
-        setExactCursor(null);
-        setExactNextCursor(null);
-        setExactCursorHistory([]);
-      }
+      if (requestId === activeSearchRequestRef.current) {
+        setResults(response.items);
+        setMode(response.mode);
+        setOffset(next);
+        setNextOffset(response.nextOffset);
+        setTotalCandidates(response.totalCandidates);
+        setAppliedQuery(queryToUse);
+        setSearchTagFacets(queryToUse.trim() ? response.facetTags ?? [] : []);
+        if (response.mode === "exact") {
+          setExactCursor(cursor);
+          setExactNextCursor(response.nextCursor ?? null);
+        } else {
+          setExactCursor(null);
+          setExactNextCursor(null);
+          setExactCursorHistory([]);
+        }
 
-      setSearchParams(
-        buildLibraryUrlSearchParams({
-          query: queryToUse,
-          genre,
-          tone,
-          selectedTags: tagsToUse,
-          excludedTags: excludedTagsToUse,
-          statusFilter,
-          hideRead: hideReadToUse,
-          tagQuery,
-          offset: next,
-          cursor: response.mode === "exact" ? cursor : null,
-        }),
-        { replace: true },
-      );
+        setSearchParams(
+          buildLibraryUrlSearchParams({
+            query: queryToUse,
+            genre,
+            tone,
+            selectedTags: tagsToUse,
+            excludedTags: excludedTagsToUse,
+            statusFilter,
+            hideRead: hideReadToUse,
+            tagQuery,
+            offset: next,
+            cursor: response.mode === "exact" ? cursor : null,
+          }),
+          { replace: true },
+        );
+      }
     } catch (searchError) {
-      setError(searchError instanceof Error ? searchError.message : "Search failed");
+      if (requestId === activeSearchRequestRef.current) {
+        setError(searchError instanceof Error ? searchError.message : "Search failed");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === activeSearchRequestRef.current) {
+        setLoading(false);
+      }
     }
   };
 
