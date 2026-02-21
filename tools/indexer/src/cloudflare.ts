@@ -61,6 +61,16 @@ function trimToUtf8Bytes(value: string, maxBytes: number): string {
   return trimmed.replace(/\uFFFD+$/g, "").trimEnd();
 }
 
+function normalizeTags(tags: string[]): string[] {
+  return [
+    ...new Set(
+      tags
+        .map((tag) => tag.trim().replace(/\s+/g, " ").toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+}
+
 function isSqlLogicError(error: unknown): boolean {
   return error instanceof Error && error.message.includes("SQL logic error: SQLITE_ERROR");
 }
@@ -301,6 +311,8 @@ export class CloudflareClient {
   }
 
   async upsertStory(story: IndexedStory) {
+    const normalizedTags = normalizeTags(story.tags);
+
     await this.d1Exec(
       `
       INSERT INTO STORIES (
@@ -355,7 +367,7 @@ export class CloudflareClient {
         story.genre,
         story.tone,
         story.setting,
-        JSON.stringify(story.tags),
+        JSON.stringify(normalizedTags),
         JSON.stringify(story.themes),
         JSON.stringify(story.contentNotes),
         story.wordCount,
@@ -370,7 +382,7 @@ export class CloudflareClient {
   async replaceStoryTags(storyId: string, tags: string[]) {
     await this.d1Exec("DELETE FROM STORY_TAGS WHERE STORY_ID = ?", [storyId]);
 
-    const uniqueTags = [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))];
+    const uniqueTags = normalizeTags(tags);
     for (const tag of uniqueTags) {
       await this.d1Exec("INSERT OR IGNORE INTO TAGS (TAG) VALUES (?)", [tag]);
       await this.d1Exec("INSERT OR REPLACE INTO STORY_TAGS (STORY_ID, TAG) VALUES (?, ?)", [storyId, tag]);

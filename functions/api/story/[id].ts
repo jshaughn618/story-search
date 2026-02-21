@@ -206,7 +206,7 @@ function normalizeUserTag(input: unknown): string | null {
   if (typeof input !== "string") {
     return null;
   }
-  const normalized = input.trim().replace(/\s+/g, " ");
+  const normalized = input.trim().replace(/\s+/g, " ").toLowerCase();
   if (!normalized) {
     return null;
   }

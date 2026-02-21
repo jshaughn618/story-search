@@ -1,345 +1,1006 @@
 [
   {
-    "tag": "Watersports",
-    "anyOf": ["pee", "piss", "urine", "watersports", "golden shower"],
+    "tag": "watersports",
+    "anyOf": [
+      "pee",
+      "piss",
+      "urine",
+      "watersports",
+      "golden shower"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Humiliation",
-    "anyOf": ["humiliation", "humiliate", "degradation", "degrade", "embarrassment", "embarrass", "shame", "shaming", "dehumanization", "dehumanize"],
+    "tag": "humiliation",
+    "anyOf": [
+      "humiliation",
+      "humiliate",
+      "degradation",
+      "degrade",
+      "embarrassment",
+      "embarrass",
+      "shame",
+      "shaming",
+      "dehumanization",
+      "dehumanize"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Femdom",
-    "anyOf": ["femdom", "female dominance", "f_dom", "f-dom", "fdom", "female domination", "dominatrix", "female dom", "goddess", "mistress", "lezdom", "femdomme"],
+    "tag": "femdom",
+    "anyOf": [
+      "femdom",
+      "female dominance",
+      "f_dom",
+      "f-dom",
+      "fdom",
+      "female domination",
+      "dominatrix",
+      "female dom",
+      "goddess",
+      "mistress",
+      "lezdom",
+      "femdomme"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Pantyhose",
-    "anyOf": ["pantyhose", "tights", "stockings", "hosiery", "nylons", "panty hose", "panty-hose", "garter"],
+    "tag": "pantyhose",
+    "anyOf": [
+      "pantyhose",
+      "tights",
+      "stockings",
+      "hosiery",
+      "nylons",
+      "panty hose",
+      "panty-hose",
+      "garter"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Bondage",
-    "anyOf": ["bondage", "bondage gear", "bondage equipment", "bondage restraints", "bondage rope", "bondage cuffs", "bondage tape", "bondage chains", "bondage harness", "bdsm", "hogtie"],
+    "tag": "bondage",
+    "anyOf": [
+      "bondage",
+      "bondage gear",
+      "bondage equipment",
+      "bondage restraints",
+      "bondage rope",
+      "bondage cuffs",
+      "bondage tape",
+      "bondage chains",
+      "bondage harness",
+      "bdsm",
+      "hogtie"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Spanking",
-    "anyOf": ["spanking", "spank", "spanked", "spanks", "paddle", "paddling", "paddled", "paddles"],
+    "tag": "spanking",
+    "anyOf": [
+      "spanking",
+      "spank",
+      "spanked",
+      "spanks",
+      "paddle",
+      "paddling",
+      "paddled",
+      "paddles"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Rape",
-    "anyOf": ["rape", "raped", "rapes", "raping", "sexual assault", "sexual abuse", "non-consensual", "reluctance"],
+    "tag": "rape",
+    "anyOf": [
+      "rape",
+      "raped",
+      "rapes",
+      "raping",
+      "sexual assault",
+      "sexual abuse",
+      "non-consensual",
+      "reluctance",
+      "non-cons",
+      "noncon"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Schoolgirl",
-    "anyOf": ["schoolgirl", "school uniform", "schoolgirl outfit", "schoolgirl costume", "jumper"],
+    "tag": "schoolgirl",
+    "anyOf": [
+      "schoolgirl",
+      "school uniform",
+      "schoolgirl outfit",
+      "schoolgirl costume",
+      "jumper"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Age Play",
-    "anyOf": ["age play", "ageplay", "age regression", "age regression play", "age regression roleplay", "age regression role play"],
+    "tag": "age play",
+    "anyOf": [
+      "age play",
+      "ageplay",
+      "age regression",
+      "age regression play",
+      "age regression roleplay",
+      "age regression role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Teen",
-    "anyOf": ["teen", "teens", "teenager", "adolescent", "young adult", "pre-teen", "preteen"],
+    "tag": "teen",
+    "anyOf": [
+      "teen",
+      "teens",
+      "teenager",
+      "adolescent",
+      "young adult"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Teen",
-    "anyOf": ["f-teen", "f_teen", "fteen", "f-teens","f_teens", "fteenager", "f-adolescent", "f-young adult", "f-pre-teen", "fpreteen", "F_teens", "F-teen", "F_teen", "Fteen", "F-teens", "F_teens", "Fteenager", "F-adolescent", "F-young adult", "F-pre-teen", "Fpreteen"],
+    "tag": "teen",
+    "anyOf": [
+      "f-teen",
+      "f_teen",
+      "fteen",
+      "f-teens",
+      "f_teens",
+      "fteenager",
+      "f-adolescent",
+      "f-young adult",
+      "f-pre-teen",
+      "fpreteen",
+      "F_teens",
+      "F-teen",
+      "F_teen",
+      "Fteen",
+      "F-teens",
+      "F_teens",
+      "Fteenager",
+      "F-adolescent",
+      "F-young adult",
+      "F-pre-teen",
+      "Fpreteen"
+    ],
     "minCount": 1,
     "caseSensitive": true,
     "matchWholeWord": true
   },
   {
-    "tag": "Torture",
-    "anyOf": ["torture", "tortured", "tortures", "torturing", "suffering", "torment", "tormented", "torments", "torturous", "whipping", "whipped", "whips", "whipping", "cane", "caning", "caned", "paddle", "paddling", "paddled", "paddles"],
+    "tag": "torture",
+    "anyOf": [
+      "torture",
+      "tortured",
+      "tortures",
+      "torturing",
+      "suffering",
+      "torment",
+      "tormented",
+      "torments",
+      "torturous",
+      "whipping",
+      "whipped",
+      "whips",
+      "whipping",
+      "cane",
+      "caning",
+      "caned",
+      "paddle",
+      "paddling",
+      "paddled",
+      "paddles"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Enema",
-    "anyOf": ["enema", "enemas", "enema play", "enema play", "enema roleplay", "enema role play"],
+    "tag": "enema",
+    "anyOf": [
+      "enema",
+      "enemas",
+      "enema play",
+      "enema play",
+      "enema roleplay",
+      "enema role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Fisting",
-    "anyOf": ["fisting", "fist", "fisted", "fists", "fist play", "fist roleplay", "fist role play"],
+    "tag": "fisting",
+    "anyOf": [
+      "fisting",
+      "fist",
+      "fisted",
+      "fists",
+      "fist play",
+      "fist roleplay",
+      "fist role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Anal",
-    "anyOf": ["anal", "anal sex", "anal play", "anal roleplay", "anal role play"],
+    "tag": "anal",
+    "anyOf": [
+      "anal",
+      "anal sex",
+      "anal play",
+      "anal roleplay",
+      "anal role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Incest",
-    "anyOf": ["incest", "incestuous", "family sex", "family roleplay", "family role play"],
+    "tag": "incest",
+    "anyOf": [
+      "incest",
+      "incestuous",
+      "family sex",
+      "family roleplay",
+      "family role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Bestiality",
-    "anyOf": ["bestiality", "bestial", "zoophilia", "zoophilic", "animal sex", "animal roleplay", "animal role play"],
+    "tag": "bestiality",
+    "anyOf": [
+      "bestiality",
+      "bestial",
+      "zoophilia",
+      "zoophilic",
+      "animal sex",
+      "animal roleplay",
+      "animal role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Scat",
-    "anyOf": ["scat", "scat play", "scat roleplay", "scat role play", "feces", "defecation", "poop"],
+    "tag": "scat",
+    "anyOf": [
+      "scat",
+      "scat play",
+      "scat roleplay",
+      "scat role play",
+      "feces",
+      "defecation",
+      "poop"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Vore",
-    "anyOf": ["vore", "vorarephilia", "vorarephilic", "vore play", "vore roleplay", "vore role play"],
+    "tag": "vore",
+    "anyOf": [
+      "vore",
+      "vorarephilia",
+      "vorarephilic",
+      "vore play",
+      "vore roleplay",
+      "vore role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Guro",
-    "anyOf": ["guro", "guro art", "guro manga", "guro anime", "guro roleplay", "guro role play"],
+    "tag": "guro",
+    "anyOf": [
+      "guro",
+      "guro art",
+      "guro manga",
+      "guro anime",
+      "guro roleplay",
+      "guro role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Necrophilia",
-    "anyOf": ["necrophilia", "necrophilic", "necrophile", "necrophiles", "necrophilia play", "necrophilia roleplay", "necrophilia role play"],
+    "tag": "necrophilia",
+    "anyOf": [
+      "necrophilia",
+      "necrophilic",
+      "necrophile",
+      "necrophiles",
+      "necrophilia play",
+      "necrophilia roleplay",
+      "necrophilia role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Snuff",
-    "anyOf": ["snuff", "snuff film", "snuff movie", "snuff roleplay", "snuff role play"],
+    "tag": "snuff",
+    "anyOf": [
+      "snuff",
+      "snuff film",
+      "snuff movie",
+      "snuff roleplay",
+      "snuff role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Gore",
-    "anyOf": ["gore", "gore art", "gore manga", "gore anime", "gore roleplay", "gore role play"],
+    "tag": "gore",
+    "anyOf": [
+      "gore",
+      "gore art",
+      "gore manga",
+      "gore anime",
+      "gore roleplay",
+      "gore role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Diaper",
-    "anyOf": ["diaper", "diapers", "diaper play", "diaper roleplay", "diaper role play", "nappy", "nappies"],
+    "tag": "diaper",
+    "anyOf": [
+      "diaper",
+      "diapers",
+      "diaper play",
+      "diaper roleplay",
+      "diaper role play",
+      "nappy",
+      "nappies"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Pregnancy",
-    "anyOf": ["pregnancy", "pregnant", "preggo", "preggos", "preg play", "preg roleplay", "preg role play"],
+    "tag": "pregnancy",
+    "anyOf": [
+      "pregnancy",
+      "pregnant",
+      "preggo",
+      "preggos",
+      "preg play",
+      "preg roleplay",
+      "preg role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Cuckold",
-    "anyOf": ["cuckold", "cuckolding", "cuckoldry", "cuckold play", "cuckold roleplay", "cuckold role play"],
+    "tag": "cuckold",
+    "anyOf": [
+      "cuckold",
+      "cuckolding",
+      "cuckoldry",
+      "cuckold play",
+      "cuckold roleplay",
+      "cuckold role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Crossdressing",
-    "anyOf": ["crossdressing", "crossdress", "crossdresser", "crossdressers", "crossdressing play", "crossdressing roleplay", "crossdressing role play"],
+    "tag": "crossdressing",
+    "anyOf": [
+      "crossdressing",
+      "crossdress",
+      "crossdresser",
+      "crossdressers",
+      "crossdressing play",
+      "crossdressing roleplay",
+      "crossdressing role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Sissification",
-    "anyOf": ["sissification", "sissy", "sissies", "sissy play", "sissy roleplay", "sissy role play"],
+    "tag": "sissification",
+    "anyOf": [
+      "sissification",
+      "sissy",
+      "sissies",
+      "sissy play",
+      "sissy roleplay",
+      "sissy role play"
+    ],
     "min  Count": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Chastity",
-    "anyOf": ["chastity", "chastity play", "chastity roleplay", "chastity role play", "chastity device", "chastity belt", "chastity cage"],
+    "tag": "chastity",
+    "anyOf": [
+      "chastity",
+      "chastity play",
+      "chastity roleplay",
+      "chastity role play",
+      "chastity device",
+      "chastity belt",
+      "chastity cage"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Cuckquean",
-    "anyOf": ["cuckquean", "cuckqueaning", "cuckqueanry", "cuckquean play", "cuckquean roleplay", "cuckquean role play"],
-    "minCount": 1,
-    "caseSensitive": false,
-    "matchWholeWord": true
-  },
-  {  
-    "tag": "BBW",
-    "anyOf": ["bbw", "big beautiful woman", "big beautiful women", "big busty woman", "big busty women", "plus size woman", "plus size women"],
-    "minCount": 1,
-    "caseSensitive": false,
-    "matchWholeWord": true
-  },
-  {
-    "tag": "BDSM",
-    "anyOf": ["bdsm", "bondage", "discipline", "dominance", "submission", "sadism", "masochism"],
+    "tag": "cuckquean",
+    "anyOf": [
+      "cuckquean",
+      "cuckqueaning",
+      "cuckqueanry",
+      "cuckquean play",
+      "cuckquean roleplay",
+      "cuckquean role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Foot Fetish",
-    "anyOf": ["foot fetish", "foot worship", "foot play", "foot roleplay", "foot role play", "foot job", "footjob"],
+    "tag": "bbw",
+    "anyOf": [
+      "bbw",
+      "big beautiful woman",
+      "big beautiful women",
+      "big busty woman",
+      "big busty women",
+      "plus size woman",
+      "plus size women"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Latex",
-    "anyOf": ["latex", "latex clothing", "latex outfit", "latex suit", "latex dress", "latex gloves"],
-    "minCount": 1,
-    "caseSensitive": false,
-    "matchWholeWord": true
-  }, 
-  {
-    "tag": "Doctor",
-    "anyOf": ["doctor", "doctor play", "doctor roleplay", "doctor role play", "gyno", "gyno play", "gyno roleplay", "gyno role play", "gynocologist", "gynecologist play", "gynecologist roleplay", "gynecologist role play"],
-    "minCount": 1,
-    "caseSensitive": false,
-    "matchWholeWord": true  
-  },
-  {
-    "tag": "Nurse",
-    "anyOf": ["nurse", "nurse play", "nurse roleplay", "nurse role play", "nursing", "nursing play", "nursing roleplay", "nursing role play"],
-    "minCount": 1,
-    "caseSensitive": false,
-    "matchWholeWord": true 
-  },
-  {
-    "tag": "Teacher",
-    "anyOf": ["teacher", "teacher play", "teacher roleplay", "teacher role play", "school teacher", "school teacher play", "school teacher roleplay", "school teacher role play"],
-    "minCount": 1,
-    "caseSensitive": false,
-    "matchWholeWord": true 
-  },
-  {
-    "tag": "Pet Play",
-    "anyOf": ["pet play", "pet roleplay", "pet role play", "puppy play", "puppy roleplay", "puppy role play", "kitten play", "kitten roleplay", "kitten role play"],
-    "minCount": 1,
-    "caseSensitive": false,
-    "matchWholeWord": true 
-  },
-  {
-    "tag": "Pussy Whipping",
-    "anyOf": ["pussy whipping", "pussy whip", "pussy whipped", "whip pussy", "whipped pussy", "pussy whipping play", "pussy whipping roleplay", "pussy whipping role play"],
+    "tag": "bdsm",
+    "anyOf": [
+      "bdsm",
+      "bondage",
+      "discipline",
+      "dominance",
+      "submission",
+      "sadism",
+      "masochism"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Cum Eating",
-    "anyOf": ["cum eating", "cum eat", "cum eaten", "cum eat play", "cum eat roleplay", "cum eat role play"],
+    "tag": "foot fetish",
+    "anyOf": [
+      "foot fetish",
+      "foot worship",
+      "foot play",
+      "foot roleplay",
+      "foot role play",
+      "foot job",
+      "footjob"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Sex Slave",
-    "anyOf": ["sex slave", "sex slave play", "sex slave roleplay", "sex slave role play", "slave", "slave play", "slave roleplay", "slave role play"],
+    "tag": "latex",
+    "anyOf": [
+      "latex",
+      "latex clothing",
+      "latex outfit",
+      "latex suit",
+      "latex dress",
+      "latex gloves"
+    ],
     "minCount": 1,
     "caseSensitive": false,
     "matchWholeWord": true
   },
   {
-    "tag": "Cunnilingus",
-    "anyOf": ["cunnilingus", "cunnilingus play", "cunnilingus roleplay", "cunnilingus role play", "cunnilingus art", "cunnilingus manga", "cunnilingus anime"],
+    "tag": "doctor",
+    "anyOf": [
+      "doctor",
+      "doctor play",
+      "doctor roleplay",
+      "doctor role play",
+      "gyno",
+      "gyno play",
+      "gyno roleplay",
+      "gyno role play",
+      "gynocologist",
+      "gynecologist play",
+      "gynecologist roleplay",
+      "gynecologist role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
-    "matchWholeWord": true  
+    "matchWholeWord": true
   },
   {
-    "tag": "Facesitting",
-    "anyOf": ["facesitting", "face sitting", "face-sitting", "facesit", "face sit", "face-sit", "facesitting play", "facesitting roleplay", "facesitting role play"],
+    "tag": "nurse",
+    "anyOf": [
+      "nurse",
+      "nurse play",
+      "nurse roleplay",
+      "nurse role play",
+      "nursing",
+      "nursing play",
+      "nursing roleplay",
+      "nursing role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
-    "matchWholeWord": true  
+    "matchWholeWord": true
   },
   {
-    "tag": "Gyno",
-    "anyOf": ["gyno", "gyno play", "gyno roleplay", "gyno role play", "gynocologist", "gynecologist play", "gynecologist roleplay", "gynecologist role play"],
+    "tag": "teacher",
+    "anyOf": [
+      "teacher",
+      "teacher play",
+      "teacher roleplay",
+      "teacher role play",
+      "school teacher",
+      "school teacher play",
+      "school teacher roleplay",
+      "school teacher role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
-    "matchWholeWord": true  
+    "matchWholeWord": true
   },
   {
-    "tag": "Masturbation",
-    "anyOf": ["masturbation", "masturbate", "masturbating", "masturbated", "masturbation play", "masturbation roleplay", "masturbation role play"],
+    "tag": "pet play",
+    "anyOf": [
+      "pet play",
+      "pet roleplay",
+      "pet role play",
+      "puppy play",
+      "puppy roleplay",
+      "puppy role play",
+      "kitten play",
+      "kitten roleplay",
+      "kitten role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
-    "matchWholeWord": true  
+    "matchWholeWord": true
   },
   {
-    "tag": "Orgy",
-    "anyOf": ["orgy", "orgies", "orgy play", "orgy roleplay", "orgy role play"],
+    "tag": "pussy whipping",
+    "anyOf": [
+      "pussy whipping",
+      "pussy whip",
+      "pussy whipped",
+      "whip pussy",
+      "whipped pussy",
+      "pussy whipping play",
+      "pussy whipping roleplay",
+      "pussy whipping role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
-    "matchWholeWord": true  
+    "matchWholeWord": true
   },
   {
-    "tag": "Creampie",
-    "anyOf": ["creampie", "creampied", "creampies", "creampie play", "creampie roleplay", "creampie role play"],
+    "tag": "cum eating",
+    "anyOf": [
+      "cum eating",
+      "cum eat",
+      "cum eaten",
+      "cum eat play",
+      "cum eat roleplay",
+      "cum eat role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
-    "matchWholeWord": true  
+    "matchWholeWord": true
   },
   {
-    "tag": "Double Penetration",
-    "anyOf": ["double penetration", "double penetration play", "double penetration roleplay", "double penetration role play", "dp", "dp play", "dp roleplay", "dp role play"],
+    "tag": "sex slave",
+    "anyOf": [
+      "sex slave",
+      "sex slave play",
+      "sex slave roleplay",
+      "sex slave role play",
+      "slave",
+      "slave play",
+      "slave roleplay",
+      "slave role play"
+    ],
     "minCount": 1,
     "caseSensitive": false,
-    "matchWholeWord": true  
+    "matchWholeWord": true
   },
   {
-    "tag": "Threesome",
-    "anyOf": ["threesome", "threesomes", "threesome play", "threesome roleplay", "threesome role play"],
+    "tag": "cunnilingus",
+    "anyOf": [
+      "cunnilingus",
+      "cunnilingus play",
+      "cunnilingus roleplay",
+      "cunnilingus role play",
+      "cunnilingus art",
+      "cunnilingus manga",
+      "cunnilingus anime"
+    ],
     "minCount": 1,
     "caseSensitive": false,
-    "matchWholeWord": true  
+    "matchWholeWord": true
+  },
+  {
+    "tag": "facesitting",
+    "anyOf": [
+      "facesitting",
+      "face sitting",
+      "face-sitting",
+      "facesit",
+      "face sit",
+      "face-sit",
+      "facesitting play",
+      "facesitting roleplay",
+      "facesitting role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "gyno",
+    "anyOf": [
+      "gyno",
+      "gyno play",
+      "gyno roleplay",
+      "gyno role play",
+      "gynocologist",
+      "gynecologist play",
+      "gynecologist roleplay",
+      "gynecologist role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "masturbation",
+    "anyOf": [
+      "masturbation",
+      "masturbate",
+      "masturbating",
+      "masturbated",
+      "masturbation play",
+      "masturbation roleplay",
+      "masturbation role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "orgy",
+    "anyOf": [
+      "orgy",
+      "orgies",
+      "orgy play",
+      "orgy roleplay",
+      "orgy role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "creampie",
+    "anyOf": [
+      "creampie",
+      "creampied",
+      "creampies",
+      "creampie play",
+      "creampie roleplay",
+      "creampie role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "double penetration",
+    "anyOf": [
+      "double penetration",
+      "double penetration play",
+      "double penetration roleplay",
+      "double penetration role play",
+      "dp",
+      "dp play",
+      "dp roleplay",
+      "dp role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "threesome",
+    "anyOf": [
+      "threesome",
+      "threesomes",
+      "threesome play",
+      "threesome roleplay",
+      "threesome role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "foursome",
+    "anyOf": [
+      "foursome",
+      "foursomes",
+      "foursome play",
+      "foursome roleplay",
+      "foursome role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "gangbang",
+    "anyOf": [
+      "gangbang",
+      "gangbangs",
+      "gangbang play",
+      "gangbang roleplay",
+      "gangbang role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "breeding",
+    "anyOf": [
+      "breeding",
+      "breeding play",
+      "breeding roleplay",
+      "breeding role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "imprisonment",
+    "anyOf": [
+      "imprisonment",
+      "captive",
+      "imprisonment play",
+      "imprisonment roleplay",
+      "imprisonment role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "blackmail",
+    "anyOf": [
+      "blackmail",
+      "blackmail play",
+      "blackmail roleplay",
+      "blackmail role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "lactation",
+    "anyOf": [
+      "lactation",
+      "lactating",
+      "lactation play",
+      "lactation roleplay",
+      "lactation role play",
+      "breastmilk",
+      "breast milk"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "squirting",
+    "anyOf": [
+      "squirting",
+      "squirt",
+      "squirted",
+      "squirts",
+      "squirting play",
+      "squirting roleplay",
+      "squirting role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "preteen",
+    "anyOf": [
+      "pre-teen",
+      "preteen",
+      "pre-teenager",
+      "preteenager"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "preteen",
+    "anyOf": [
+      "f-pre-teen",
+      "fpreteen",
+      "F-pre-teen",
+      "Fpreteen",
+      "f_preteen",
+      "F_preteen"
+    ],
+    "minCount": 1,
+    "caseSensitive": true,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "small tits",
+    "anyOf": [
+      "small tits",
+      "small breasts",
+      "small boobs",
+      "small chest",
+      "tiny tits",
+      "tiny breasts",
+      "tiny boobs",
+      "tiny chest",
+      "flat chest",
+      "flat chested",
+      "small buds",
+      "tiny buds"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "big tits",
+    "anyOf": [
+      "big tits",
+      "big breasts",
+      "big boobs",
+      "big chest",
+      "large tits",
+      "large breasts",
+      "large boobs",
+      "large chest",
+      "huge tits",
+      "huge breasts",
+      "huge boobs",
+      "huge chest"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "virgin",
+    "anyOf": [
+      "virgin",
+      "virgins",
+      "virginity",
+      "virgin play",
+      "virgin roleplay",
+      "virgin role play"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "young",
+    "anyOf": [
+      "young girl",
+      "young teen",
+      "adolescent",
+      "young adult"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
+  },
+  {
+    "tag": "young",
+    "anyOf": [
+      "Mg",
+      "Mgg",
+      "Mggg",
+      "Mg+",
+      "Fg",
+      "Fgg",
+      "Fg+",
+      "fg",
+      "mg",
+      "MMM~g",
+      "MMM~g+",
+      "MMM/g",
+      "M~g",
+      "M~g+",
+      "M/g",
+      "Mggg+",
+      "Mggg~g",
+      "Mggg~g+",
+      "Mggg/g",
+      "F~g",
+      "F~g+",
+      "F/g",
+      "Fggg",
+      "Fggg+",
+      "Fggg~g",
+      "Fggg~g+",
+      "Fggg/g",
+      "yng"
+    ],
+    "minCount": 1,
+    "caseSensitive": true,
+    "matchWholeWord": false
+  },
+  {
+    "tag": "captive",
+    "anyOf": [
+      "captive",
+      "captivity",
+      "captive play",
+      "captive roleplay",
+      "captive role play",
+      "prisoner",
+      "imprisioned",
+      "imprisonment"
+    ],
+    "minCount": 1,
+    "caseSensitive": false,
+    "matchWholeWord": true
   }
 ]

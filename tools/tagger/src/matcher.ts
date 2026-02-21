@@ -9,37 +9,12 @@ function countMatches(text: string, regex: RegExp): number {
   return matches ? matches.length : 0;
 }
 
-function isRuleStyled(tag: string): boolean {
-  return tag !== tag.toLowerCase();
-}
-
-function titleCaseTag(value: string): string {
-  return value
-    .split(" ")
-    .map((word) => {
-      if (!word) {
-        return word;
-      }
-      return word[0].toUpperCase() + word.slice(1).toLowerCase();
-    })
-    .join(" ");
-}
-
-function normalizeTagForm(tag: string, source: string): string {
+function normalizeTagForm(tag: string, _source: string): string {
   const normalized = tag.trim().replace(/\s+/g, " ");
   if (!normalized) {
     return "";
   }
-
-  if (source.startsWith("ruleset:")) {
-    return normalized;
-  }
-
-  if (normalized.includes(" ") && !isRuleStyled(normalized)) {
-    return titleCaseTag(normalized);
-  }
-
-  return normalized;
+  return normalized.toLowerCase();
 }
 
 export function applyCompiledRules(text: string, rules: CompiledTagRule[]): string[] {

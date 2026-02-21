@@ -162,5 +162,18 @@ export class D1Client {
 
       await this.query(sql, params);
     }
+
+    for (const update of updates) {
+      await this.query("DELETE FROM STORY_TAGS WHERE STORY_ID = ?", [update.storyId]);
+      for (const tag of update.tags) {
+        await this.query("INSERT OR IGNORE INTO TAGS (TAG) VALUES (?)", [tag]);
+        await this.query("INSERT OR IGNORE INTO STORY_TAGS (STORY_ID, TAG) VALUES (?, ?)", [
+          update.storyId,
+          tag,
+        ]);
+      }
+    }
+
+    await this.query("DELETE FROM TAGS WHERE TAG NOT IN (SELECT DISTINCT TAG FROM STORY_TAGS)");
   }
 }
